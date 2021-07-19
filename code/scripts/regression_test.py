@@ -1,6 +1,8 @@
 # Internals
 from ..lib.deq import (FullyConnectedLayer, DEQFixedPoint)
 from ..lib.data import SequenceOneDimension
+from ..lib.plotters import (matplotlib_gc, matplotlib_config, 
+        plot_1d_sequence_data)
 
 # Torch
 import torch
@@ -17,7 +19,7 @@ import matplotlib.pyplot as plt
 NUM_TRAIN   = 100
 NUM_TEST    = 100
 NUM_PLOT    = 1000
-DIMENSION_Y = 500
+DIMENSION_Y = 1000
 NOISE_VAR   = 0.01
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -49,7 +51,7 @@ X_plot_input, Y_plot_input, X_plot_target, Y_plot_target = \
 
 ################################## One training or testing iteration
 def epoch(data, model, opt=None, lr_scheduler=None):
-    total_loss, total_err = 0.,0.
+    total_loss = 0.
     model.eval() if opt is None else model.train()
 
     X, y = data
@@ -63,7 +65,7 @@ def epoch(data, model, opt=None, lr_scheduler=None):
     
     total_loss += loss.item() * list(X.shape)[0]
 
-    return total_err / list(X.shape)[0], total_loss / list(X.shape)[0]
+    return total_loss / list(X.shape)[0]
 
 ################################## Optimise, minimising the cross entropy loss
 opt = optim.Adam(model.parameters(), lr=1e-3)
@@ -71,47 +73,35 @@ print("# Parmeters: ", sum(a.numel() for a in model.parameters()))
 
 max_epochs = 20
 scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, max_epochs*NUM_TRAIN, eta_min=1e-6)
-
+train_err = np.zeros((max_epochs,))
+test_err = np.zeros((max_epochs,))
 for i in range(max_epochs):
-    print(epoch([Y_train_input, Y_train_target], model, opt, scheduler))
-    print(epoch([Y_test_input, Y_test_target], model))
+    train_err[i] = epoch([Y_train_input, Y_train_target], model, opt, scheduler)
+    test_err[i] = epoch([Y_test_input, Y_test_target], model)
 
-ALPHA = 0.2
+matplotlib_config()
 
-# Plot training input data
-for p in range(5):
-    plt.plot(X_train_input[p,:], Y_train_input[p,:], 
-            label='train_input'+str(p), alpha=ALPHA)
-plt.plot(X_plot_input[0,:], Y_plot_input[0,:], lw=2, c='k', label='gt')
-plt.legend()
-plt.savefig('plot_input_train.pdf')
-plt.close()
-
-# Plot training target data
-for p in range(5):
-    plt.plot(X_train_target[p,:], Y_train_target[p,:], 
-            label='train_target'+str(p), alpha=ALPHA)
-plt.plot(X_plot_target[0,:], Y_plot_target[0,:], lw=2, c='k', label='gt')
-plt.legend()
-plt.savefig('plot_target_train.pdf')
-plt.close()
-
-# Plot test target data
-for p in range(5):
-    plt.plot(X_test_target[p,:], Y_test_target[p,:], 
-            label='test_target'+str(p), alpha=ALPHA)
-plt.plot(X_plot_target[0,:], Y_plot_target[0,:], lw=2, c='k', label='gt')
-plt.legend()
-plt.savefig('plot_target_test.pdf')
-plt.close()
-
-# Plot test prediction data
+xlim = [-2*np.pi-OFFSET, 2*np.pi]
+ylim = [-0.6, 0.8]
+plot_1d_sequence_data(X_train_input, Y_train_input, 
+        X_plot_input, Y_plot_input, 'plot_input_train.pdf', xlim, ylim)
+plot_1d_sequence_data(X_train_target, Y_train_target, 
+        X_plot_target, Y_plot_target, 'plot_target_train.pdf', xlim, ylim)
+pred = model(Y_train_input).detach().numpy()
+plot_1d_sequence_data(X_train_target, pred, 
+        X_plot_target, Y_plot_target, 'plot_target_train_pred.pdf', xlim, ylim)
+plot_1d_sequence_data(X_test_input, Y_test_input, 
+        X_plot_input, Y_plot_input, 'plot_input_test.pdf', xlim, ylim)
+plot_1d_sequence_data(X_test_target, Y_test_target, 
+        X_plot_target, Y_plot_target, 'plot_target_test.pdf', xlim, ylim)
 pred = model(Y_test_input).detach().numpy()
-for p in range(5):
-    plt.plot(X_test_target[p,:], pred[p,:], 
-            label='test_prediction'+str(p), alpha=ALPHA)
-plt.plot(X_plot_target[0,:], Y_plot_target[0,:], lw=2, c='k', label='gt')
+plot_1d_sequence_data(X_test_target, pred, 
+        X_plot_target, Y_plot_target, 'plot_target_test_pred.pdf', xlim, ylim)
+
+# Plot error curves
+plt.plot(train_err, label='training')
+plt.plot(test_err, label='training')
 plt.legend()
-plt.savefig('plot_target_pred.pdf')
+plt.savefig('error_curve.pdf')
 plt.close()
 
