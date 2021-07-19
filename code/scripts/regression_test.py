@@ -21,14 +21,10 @@ NUM_TEST    = 100
 NUM_PLOT    = 1000
 DIMENSION_Y = 1000
 NOISE_VAR   = 0.01
+INITIALISE_AS_GLM = False
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(0)
-
-################################## Initialise the Model
-f = FullyConnectedLayer(DIMENSION_Y, DIMENSION_Y, DIMENSION_Y)
-model = nn.Sequential(DEQFixedPoint(f, solver=None, tol=1e-2, max_iter=25, m=5)).\
-                      to(device)
 
 ################################## Load regression data
 TARGET_FUN  = lambda x: np.exp(-np.abs(x)) * np.sin(x) + np.exp(-(x+9)**2)
@@ -48,6 +44,15 @@ plot_data = SequenceOneDimension(-2*np.pi, 2*np.pi, DIMENSION_Y, OFFSET,
         0)
 X_plot_input, Y_plot_input, X_plot_target, Y_plot_target = \
         plot_data.sample_inputs_targets(NUM_PLOT, TARGET_FUN)
+
+################################## Initialise the Model
+if INITIALISE_AS_GLM:
+    x_init = X_train_input
+else:
+    x_init = None
+f = FullyConnectedLayer(DIMENSION_Y, DIMENSION_Y, DIMENSION_Y, x_init=x_init)
+model = nn.Sequential(DEQFixedPoint(f, solver=None, tol=1e-2, max_iter=25, m=5)).\
+                      to(device)
 
 ################################## One training or testing iteration
 def epoch(data, model, opt=None, lr_scheduler=None):
@@ -71,7 +76,7 @@ def epoch(data, model, opt=None, lr_scheduler=None):
 opt = optim.Adam(model.parameters(), lr=1e-3)
 print("# Parmeters: ", sum(a.numel() for a in model.parameters()))
 
-max_epochs = 20
+max_epochs = 5
 scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, max_epochs*NUM_TRAIN, eta_min=1e-6)
 train_err = np.zeros((max_epochs,))
 test_err = np.zeros((max_epochs,))
@@ -100,8 +105,7 @@ plot_1d_sequence_data(X_test_target, pred,
 
 # Plot error curves
 plt.plot(train_err, label='training')
-plt.plot(test_err, label='training')
+plt.plot(test_err, label='testing')
 plt.legend()
 plt.savefig('error_curve.pdf')
 plt.close()
-
