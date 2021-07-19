@@ -1,0 +1,5 @@
+*.swp
+cifar-10*
+env/*
+*.pdf
+*pycache
