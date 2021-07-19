@@ -1,5 +1,6 @@
 # Internals
 from ..lib.deq import (FullyConnectedLayer, DEQFixedPoint)
+from ..lib.data import SequenceOneDimension
 
 # Torch
 import torch
@@ -16,7 +17,7 @@ import matplotlib.pyplot as plt
 NUM_TRAIN   = 100
 NUM_TEST    = 100
 NUM_PLOT    = 1000
-DIMENSION_Y = 1000
+DIMENSION_Y = 500
 NOISE_VAR   = 0.01
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -27,50 +28,24 @@ f = FullyConnectedLayer(DIMENSION_Y, DIMENSION_Y, DIMENSION_Y)
 model = nn.Sequential(DEQFixedPoint(f, solver=None, tol=1e-2, max_iter=25, m=5)).\
                       to(device)
 
-################################## Load CIFAR10
+################################## Load regression data
 TARGET_FUN  = lambda x: np.exp(-np.abs(x)) * np.sin(x) + np.exp(-(x+9)**2)
 OFFSET      = 2
 
-X_train_input = np.tile(np.linspace(-2*np.pi, 2*np.pi, DIMENSION_Y),
-            [NUM_TRAIN, 1])
-X_train_target = np.tile(np.linspace(-2*np.pi-OFFSET, 2*np.pi-OFFSET, DIMENSION_Y),
-            [NUM_TRAIN, 1])
-Y_train_input = TARGET_FUN(X_train_input) + np.random.normal(0, np.sqrt(NOISE_VAR),
-        (NUM_TRAIN, DIMENSION_Y))
-Y_train_target = TARGET_FUN(X_train_target) + np.random.normal(0, np.sqrt(NOISE_VAR),
-        (NUM_TRAIN, DIMENSION_Y))
+train_data = SequenceOneDimension(-2*np.pi, 2*np.pi, DIMENSION_Y, OFFSET,
+        NOISE_VAR)
+X_train_input, Y_train_input, X_train_target, Y_train_target = \
+        train_data.sample_inputs_targets(NUM_TRAIN, TARGET_FUN)
 
-X_test_input = np.tile(np.linspace(-2*np.pi, 2*np.pi, DIMENSION_Y),
-            [NUM_TEST, 1])
-X_test_target = np.tile(np.linspace(-2*np.pi-OFFSET, 2*np.pi-OFFSET, DIMENSION_Y),
-            [NUM_TEST, 1])
-Y_test_input = TARGET_FUN(X_test_input) + np.random.normal(0, np.sqrt(NOISE_VAR),
-        (NUM_TEST, DIMENSION_Y))
-Y_test_target = TARGET_FUN(X_test_target) + np.random.normal(0, np.sqrt(NOISE_VAR),
-        (NUM_TEST, DIMENSION_Y))
+test_data = SequenceOneDimension(-2*np.pi, 2*np.pi, DIMENSION_Y, OFFSET,
+        NOISE_VAR)
+X_test_input, Y_test_input, X_test_target, Y_test_target = \
+        test_data.sample_inputs_targets(NUM_TEST, TARGET_FUN)
 
-X_plot_input = np.tile(np.linspace(-2*np.pi, 2*np.pi, DIMENSION_Y),
-            [NUM_PLOT, 1])
-X_plot_target = np.tile(np.linspace(-2*np.pi-OFFSET, 2*np.pi-OFFSET, DIMENSION_Y),
-            [NUM_PLOT, 1])
-Y_plot_input = TARGET_FUN(X_plot_input) 
-Y_plot_target = TARGET_FUN(X_plot_target) 
-
-X_train_input = torch.from_numpy(X_train_input.astype(np.float32))
-X_train_target = torch.from_numpy(X_train_target.astype(np.float32))
-Y_train_input = torch.from_numpy(Y_train_input.astype(np.float32))
-Y_train_target = torch.from_numpy(Y_train_target.astype(np.float32))
-
-X_test_input = torch.from_numpy(X_test_input.astype(np.float32))
-X_test_target = torch.from_numpy(X_test_target.astype(np.float32))
-Y_test_input = torch.from_numpy(Y_test_input.astype(np.float32))
-Y_test_target = torch.from_numpy(Y_test_target.astype(np.float32))
-
-X_plot_input = torch.from_numpy(X_plot_input.astype(np.float32))
-X_plot_target = torch.from_numpy(X_plot_target.astype(np.float32))
-Y_plot_input = torch.from_numpy(Y_plot_input.astype(np.float32))
-Y_plot_target = torch.from_numpy(Y_plot_target.astype(np.float32))
-
+plot_data = SequenceOneDimension(-2*np.pi, 2*np.pi, DIMENSION_Y, OFFSET,
+        0)
+X_plot_input, Y_plot_input, X_plot_target, Y_plot_target = \
+        plot_data.sample_inputs_targets(NUM_PLOT, TARGET_FUN)
 
 ################################## One training or testing iteration
 def epoch(data, model, opt=None, lr_scheduler=None):
@@ -94,7 +69,7 @@ def epoch(data, model, opt=None, lr_scheduler=None):
 opt = optim.Adam(model.parameters(), lr=1e-3)
 print("# Parmeters: ", sum(a.numel() for a in model.parameters()))
 
-max_epochs = 100
+max_epochs = 20
 scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, max_epochs*NUM_TRAIN, eta_min=1e-6)
 
 for i in range(max_epochs):
