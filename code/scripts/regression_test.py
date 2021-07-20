@@ -19,9 +19,10 @@ import matplotlib.pyplot as plt
 NUM_TRAIN   = 100
 NUM_TEST    = 100
 NUM_PLOT    = 1000
-DIMENSION_Y = 1000
+DIMENSION_Y = 100
 NOISE_VAR   = 0.01
-INITIALISE_AS_GLM = False
+MAX_EPOCHS  = 50
+INITIALISE_AS_GLM = True
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(0)
@@ -47,10 +48,13 @@ X_plot_input, Y_plot_input, X_plot_target, Y_plot_target = \
 
 ################################## Initialise the Model
 if INITIALISE_AS_GLM:
-    x_init = X_train_input
+    x_init = [X_train_input, X_train_target]
+    y_init = Y_train_input
 else:
     x_init = None
-f = FullyConnectedLayer(DIMENSION_Y, DIMENSION_Y, DIMENSION_Y, x_init=x_init)
+    y_init = None
+f = FullyConnectedLayer(DIMENSION_Y, DIMENSION_Y, DIMENSION_Y, 
+        x_init = x_init, y_init = y_init)
 model = nn.Sequential(DEQFixedPoint(f, solver=None, tol=1e-2, max_iter=25, m=5)).\
                       to(device)
 
@@ -76,11 +80,11 @@ def epoch(data, model, opt=None, lr_scheduler=None):
 opt = optim.Adam(model.parameters(), lr=1e-3)
 print("# Parmeters: ", sum(a.numel() for a in model.parameters()))
 
-max_epochs = 5
-scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, max_epochs*NUM_TRAIN, eta_min=1e-6)
-train_err = np.zeros((max_epochs,))
-test_err = np.zeros((max_epochs,))
-for i in range(max_epochs):
+
+scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, MAX_EPOCHS*NUM_TRAIN, eta_min=1e-6)
+train_err = np.zeros((MAX_EPOCHS,))
+test_err = np.zeros((MAX_EPOCHS,))
+for i in range(MAX_EPOCHS):
     train_err[i] = epoch([Y_train_input, Y_train_target], model, opt, scheduler)
     test_err[i] = epoch([Y_test_input, Y_test_target], model)
 
