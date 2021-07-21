@@ -46,19 +46,23 @@ class FullyConnectedLayer(nn.Module):
             kernel = lambda x1, x2: np.exp(-\
                     sp.distance.cdist(x1, x2, 'sqeuclidean')/(2))
             K = kernel(x.T, x.T)
+            lamb = (np.linalg.norm(K)/5)
             K_star = kernel(x_star.T, x.T)
-            neg_K = lambda K: -torch.from_numpy(K.\
-                    astype(np.float32))
+
             neg_K_norm = lambda K:  -torch.from_numpy(K.\
-                    astype(np.float32))/np.sqrt(self.width)
+                    astype(np.float32))/lamb
             K_norm = lambda K:  torch.from_numpy(K.\
-                    astype(np.float32))/np.sqrt(self.width)
+                    astype(np.float32))/lamb
 
             self.linear1.weight = nn.parameter.Parameter(neg_K_norm(K))
             self.linear2.weight = nn.parameter.Parameter(K_norm(K))
             self.linear3.weight = nn.parameter.Parameter(neg_K_norm(K_star))
+            #TODO: For some reason we are off by a negative sign here
+            self.linear3.weight = nn.parameter.Parameter(K_norm(K_star))
 
-            self.linear3.bias = nn.parameter.Parameter( (K_norm(K_star) @ y_init.T).T )
+            y_av = torch.mean(y_init, dim=0)
+
+            self.linear3.bias = nn.parameter.Parameter(K_norm(K_star) @ y_av)
 
     def _init_activation(self, activation):
         if activation is None:
@@ -110,9 +114,22 @@ class DEQFixedPoint(nn.Module):
                 break
         return X[:,k%m].view_as(x0), res
 
+    @staticmethod
+    def forward_iteration(f, x0, m=None, lam=None, max_iter=50, tol=1e-2, beta=None):
+        f0 = f(x0)
+        res = []
+        for k in range(max_iter):
+            x = f0
+            f0 = f(x)
+            res.append((f0 - x).norm().item() / (1e-5 + f0.norm().item()))
+            if (res[-1] < tol):
+                break
+        return f0, res
+
     def _init_solver(self, solver):
         if solver is None:
             solver = self.anderson
+            #solver = self.forward_iteration
         self.solver = solver
 
     def forward(self, x):
