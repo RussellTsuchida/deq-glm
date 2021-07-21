@@ -27,6 +27,7 @@ def matplotlib_config():
 
 def plot_1d_sequence_data(x, y, x_plot, y_plot, fname, xlim=None, ylim=None):
     alpha = 0.5
+    plt.figure()
     for p in range(5):
         plt.plot(x[p,:], y[p,:],
                 label='train_input'+str(p), alpha=alpha)
