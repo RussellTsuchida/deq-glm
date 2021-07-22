@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 
 NUM_TRAIN   = 100
-NUM_TEST    = 10000
+NUM_TEST    = 1000
 NUM_PLOT    = 100
 DIMENSION_Y = 100
 NOISE_VAR   = 0.01
@@ -59,8 +59,8 @@ for m_idx, initialise_as_glm in enumerate([True, False]):
         save_dir = 'not_glm_init/'
     f = FullyConnectedLayer(DIMENSION_Y, DIMENSION_Y, DIMENSION_Y, 
             x_init = x_init, y_init = y_init)
-    model = nn.Sequential(DEQFixedPoint(f, solver=None, tol=1e-2, max_iter=25, m=5)).\
-                          to(device)
+    model = nn.Sequential(DEQFixedPoint(f, solver=None, tol=1e-2, max_iter=25, m=5),
+            f.linear3).to(device)
 
     ################################## One training or testing iteration
     def epoch(data, model, opt=None, lr_scheduler=None):
@@ -90,6 +90,7 @@ for m_idx, initialise_as_glm in enumerate([True, False]):
     train_err = np.zeros((MAX_EPOCHS,))
     test_err = np.zeros((MAX_EPOCHS,))
     for i in range(MAX_EPOCHS):
+        print(i)
         train_err[i] = epoch([Y_train_input, Y_train_target], model, opt, scheduler)
         test_err[i] = epoch([Y_test_input, Y_test_target], model)
 

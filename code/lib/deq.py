@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.autograd as autograd
 import numpy as np
+import copy
 import scipy.spatial as sp
 
 class ResNetLayer(nn.Module):
@@ -44,24 +45,21 @@ class FullyConnectedLayer(nn.Module):
         if not (x_init is None):
             x = x_init[0]; x_star = x_init[1]
             kernel = lambda x1, x2: np.exp(-\
-                    sp.distance.cdist(x1, x2, 'sqeuclidean')/(2))
+                    sp.distance.cdist(x1, x2, 'sqeuclidean')/(2)).astype(np.float32)
             K = kernel(x.T, x.T)
             lamb = (np.linalg.norm(K)/5)
             K_star = kernel(x_star.T, x.T)
 
-            neg_K_norm = lambda K:  -torch.from_numpy(K.\
-                    astype(np.float32))/lamb
-            K_norm = lambda K:  torch.from_numpy(K.\
-                    astype(np.float32))/lamb
-
+            neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/lamb)
+            K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/lamb)
+            
+            # TODO: For some reason the signs of linear1 and linear2 are swapped
             self.linear1.weight = nn.parameter.Parameter(neg_K_norm(K))
             self.linear2.weight = nn.parameter.Parameter(K_norm(K))
+
             self.linear3.weight = nn.parameter.Parameter(neg_K_norm(K_star))
-            #TODO: For some reason we are off by a negative sign here
-            self.linear3.weight = nn.parameter.Parameter(K_norm(K_star))
 
             y_av = torch.mean(y_init, dim=0)
-
             self.linear3.bias = nn.parameter.Parameter(K_norm(K_star) @ y_av)
 
     def _init_activation(self, activation):
@@ -71,7 +69,7 @@ class FullyConnectedLayer(nn.Module):
         
     def forward(self, z, x):
         y = self.activation(self.linear1(z) + self.linear2(x))
-        return self.linear3(y)
+        return -y
 
 class DEQFixedPoint(nn.Module):
     def __init__(self, f, solver=None, **kwargs):
@@ -135,7 +133,7 @@ class DEQFixedPoint(nn.Module):
     def forward(self, x):
         # compute forward pass and re-engage autograd tape
         with torch.no_grad():
-            z, self.forward_res = self.solver(\
+            z, _ = self.solver(\
                     lambda z: self.f(z, x),torch.zeros_like(x),**self.kwargs)
         z = self.f(z,x)
         
