@@ -25,7 +25,7 @@ class SequenceOneDimension(object):
         return samples
 
     def sample_inputs_targets(self, num_samples, target_fun, 
-            normalise_x = True, normalise_y = True):
+            normalise_x = True, normalise_y = True, as_torch=True):
         X_input = np.tile(np.linspace(-2*np.pi, 2*np.pi, self.dimension_y),
                     [num_samples, 1])
         X_target = np.tile(np.linspace(-2*np.pi-self.offset, 2*np.pi-self.offset, 
@@ -46,8 +46,11 @@ class SequenceOneDimension(object):
             std = np.std(Y_input, axis=1).reshape((-1,1))
             Y_input = (Y_input - mean)/std
             Y_target = (Y_target - mean)/std
-
-        f = lambda x: torch.from_numpy(x.astype(np.float32))
+        
+        if as_torch:
+            f = lambda x: torch.from_numpy(x.astype(np.float32))
+        else:
+            f = lambda x: x
 
         return [f(X_input), f(Y_input), f(X_target), f(Y_target)]
         

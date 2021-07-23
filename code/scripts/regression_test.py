@@ -17,18 +17,19 @@ import matplotlib.pyplot as plt
 
 
 NUM_TRAIN   = 100
-NUM_TEST    = 1000
+NUM_TEST    = 5000
 NUM_PLOT    = 100
 DIMENSION_Y = 100
 NOISE_VAR   = 0.01
-MAX_EPOCHS  = 0
+MAX_EPOCHS  = 200
+TARGET_FUN  = lambda x: (np.exp(-0.1*np.abs(x)**2) * np.sin(x) + np.exp(-(x+9)**2))
+OFFSET      = 2
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(0)
 
 ################################## Load regression data
-TARGET_FUN  = lambda x: np.exp(-np.abs(x)) * np.sin(x) + np.exp(-(x+9)**2)
-OFFSET      = 2
+
 
 train_data = SequenceOneDimension(-2*np.pi, 2*np.pi, DIMENSION_Y, OFFSET,
         NOISE_VAR)
@@ -75,7 +76,8 @@ for m_idx, initialise_as_glm in enumerate([True, False]):
             opt.zero_grad()
             loss.backward()
             opt.step()
-            lr_scheduler.step()
+            if not (lr_scheduler is None):
+                lr_scheduler.step()
         
         total_loss += loss.item() * list(X.shape)[0]
 
@@ -87,6 +89,7 @@ for m_idx, initialise_as_glm in enumerate([True, False]):
 
 
     scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, MAX_EPOCHS*NUM_TRAIN, eta_min=1e-6)
+    scheduler = None
     train_err = np.zeros((MAX_EPOCHS,))
     test_err = np.zeros((MAX_EPOCHS,))
     for i in range(MAX_EPOCHS):

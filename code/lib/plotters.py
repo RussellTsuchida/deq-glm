@@ -28,7 +28,9 @@ def matplotlib_config():
 def plot_1d_sequence_data(x, y, x_plot, y_plot, fname, xlim=None, ylim=None):
     alpha = 0.5
     plt.figure()
-    for p in range(5):
+    pmax = min(5, x.shape[0])
+
+    for p in range(pmax):
         plt.plot(x[p,:], y[p,:],
                 label='train_input'+str(p), alpha=alpha)
     plt.plot(x_plot[0,:], y_plot[0,:], lw=2, c='k', label='gt')

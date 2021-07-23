@@ -44,32 +44,46 @@ class FullyConnectedLayer(nn.Module):
 
         if not (x_init is None):
             x = x_init[0]; x_star = x_init[1]
-            kernel = lambda x1, x2: np.exp(-\
-                    sp.distance.cdist(x1, x2, 'sqeuclidean')/(2)).astype(np.float32)
-            K = kernel(x.T, x.T)
-            lamb = (np.linalg.norm(K)/5)
-            K_star = kernel(x_star.T, x.T)
+            kernel = lambda x1, x2: (np.exp(-\
+                    sp.distance.cdist(x1, x2, 'sqeuclidean')/(2)) + \
+                    0*np.eye(x1.shape[0])).astype(np.float32)
+            T = 8
+            K = kernel(x.T, x.T)/T
+            lamb = (np.linalg.norm(K)/8)
+            evals = np.linalg.eigvals(K/(T*lamb))
 
-            neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/lamb)
-            K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/lamb)
+            print(np.amax(evals))
+            print(np.linalg.norm(K/(lamb*T)))
+
+            print(lamb)
+            x0 = torch.zeros_like(x)
+
+
+            K_star = kernel(x_star.T, x.T)/T
+
+            neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb*T))
+            K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb*T))
             
             # TODO: For some reason the signs of linear1 and linear2 are swapped
             self.linear1.weight = nn.parameter.Parameter(neg_K_norm(K))
             self.linear2.weight = nn.parameter.Parameter(K_norm(K))
-
-            self.linear3.weight = nn.parameter.Parameter(neg_K_norm(K_star))
-
+            
+            self.linear3.weight = nn.parameter.Parameter(neg_K_norm(T*K_star))
             y_av = torch.mean(y_init, dim=0)
-            self.linear3.bias = nn.parameter.Parameter(K_norm(K_star) @ y_av)
+            self.linear3.bias = nn.parameter.Parameter(K_norm(T*K_star) @ y_av)
 
     def _init_activation(self, activation):
         if activation is None:
-            activation = torch.nn.Tanh()
+            #activation = torch.nn.Identity()
+            activation = lambda z: torch.nn.Tanh()(z)
+            #activation = torch.nn.Sigmoid()
+            #activation = torch.erf
+            #activation = torch.nn.ReLU()
         self.activation = activation
         
     def forward(self, z, x):
         y = self.activation(self.linear1(z) + self.linear2(x))
-        return -y
+        return y
 
 class DEQFixedPoint(nn.Module):
     def __init__(self, f, solver=None, **kwargs):
@@ -132,11 +146,15 @@ class DEQFixedPoint(nn.Module):
 
     def forward(self, x):
         # compute forward pass and re-engage autograd tape
+        #x0 = torch.normal(0, 1, size=x.shape)
+        x0 = torch.zeros_like(x)
         with torch.no_grad():
-            z, _ = self.solver(\
-                    lambda z: self.f(z, x),torch.zeros_like(x),**self.kwargs)
+            z, err = self.solver(\
+                    lambda z: self.f(z, x),x0,**self.kwargs)
         z = self.f(z,x)
-        
+
+
+
         # set up Jacobian vector product (without additional forward calls)
         z0 = z.clone().detach().requires_grad_()
         f0 = self.f(z0,x)
