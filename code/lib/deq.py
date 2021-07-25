@@ -38,26 +38,30 @@ class FullyConnectedLayer(nn.Module):
         self.linear1 = nn.Linear(self.num_in, self.width, bias=False)
         self.linear2 = nn.Linear(self.num_in, self.width)
         self.linear3 = nn.Linear(self.width, self.num_out)
+        self.linear4 = nn.Linear(self.num_in, self.num_out, bias = False)
 
         self.linear2.bias = nn.parameter.Parameter(torch.zeros((self.width)))
         self.linear3.bias = nn.parameter.Parameter(torch.zeros((self.num_out)))
+
+        self.linear4.weight = nn.parameter.Parameter(torch.zeros((self.num_in, self.num_out)))
+        self.linear4.weight.requires_grad = False
 
         if not (x_init is None):
             x = x_init[0]; x_star = x_init[1]
             kernel = lambda x1, x2: (np.exp(-\
                     sp.distance.cdist(x1, x2, 'sqeuclidean')/(2)) + \
                     0*np.eye(x1.shape[0])).astype(np.float32)
-            T = 8
+            T = 5
             K = kernel(x.T, x.T)/T
             lamb = (np.linalg.norm(K)/8)
             evals = np.linalg.eigvals(K/(T*lamb))
-
+            
+            print(np.linalg.det(K/(T*lamb)))
             print(np.amax(evals))
             print(np.linalg.norm(K/(lamb*T)))
 
             print(lamb)
             x0 = torch.zeros_like(x)
-
 
             K_star = kernel(x_star.T, x.T)/T
 
@@ -69,8 +73,11 @@ class FullyConnectedLayer(nn.Module):
             self.linear2.weight = nn.parameter.Parameter(K_norm(K))
             
             self.linear3.weight = nn.parameter.Parameter(neg_K_norm(T*K_star))
-            y_av = torch.mean(y_init, dim=0)
-            self.linear3.bias = nn.parameter.Parameter(K_norm(T*K_star) @ y_av)
+            self.linear4.weight = nn.parameter.Parameter(K_norm(T*K_star))
+
+            self.linear4.weight.requires_grad = True
+            #y_av = torch.mean(y_init, dim=0)
+            #self.linear3.bias = nn.parameter.Parameter(K_norm(T*K_star) @ y_av)
 
     def _init_activation(self, activation):
         if activation is None:
@@ -153,8 +160,6 @@ class DEQFixedPoint(nn.Module):
                     lambda z: self.f(z, x),x0,**self.kwargs)
         z = self.f(z,x)
 
-
-
         # set up Jacobian vector product (without additional forward calls)
         z0 = z.clone().detach().requires_grad_()
         f0 = self.f(z0,x)
@@ -166,4 +171,13 @@ class DEQFixedPoint(nn.Module):
                 
         z.register_hook(backward_hook)
         return z
+
+class DEQGLM(nn.Module):
+    def __init__(self, f, solver=None, **kwargs):
+        super().__init__()
+        self.deq = DEQFixedPoint(f, solver, **kwargs)
+
+    def forward(self, x):
+        z = self.deq(x)
+        return self.deq.f.linear3(z) + self.deq.f.linear4(x)
 
