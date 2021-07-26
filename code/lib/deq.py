@@ -57,10 +57,9 @@ class FullyConnectedLayer(nn.Module):
             evals = np.linalg.eigvals(K/(T*lamb))
             
             print(np.linalg.det(K/(T*lamb)))
-            print(np.amax(evals))
             print(np.linalg.norm(K/(lamb*T)))
-
             print(lamb)
+
             x0 = torch.zeros_like(x)
 
             K_star = kernel(x_star.T, x.T)/T
@@ -68,7 +67,6 @@ class FullyConnectedLayer(nn.Module):
             neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb*T))
             K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb*T))
             
-            # TODO: For some reason the signs of linear1 and linear2 are swapped
             self.linear1.weight = nn.parameter.Parameter(neg_K_norm(K))
             self.linear2.weight = nn.parameter.Parameter(K_norm(K))
             
