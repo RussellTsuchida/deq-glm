@@ -26,13 +26,21 @@ class ResNetLayer(nn.Module):
 
 class FullyConnectedLayer(nn.Module):
     def __init__(self, num_in, width, num_out, activation=None, x_init=None, 
-            y_init=None):
+            y_init=None, kernel=None):
         super().__init__()
         self.num_in = num_in
         self.num_out = num_out
         self.width  = width
+        self._init_kernel(kernel)
         self._init_activation(activation)
         self._init_layers(x_init, y_init)
+
+    def _init_kernel(self, kernel):
+        if kernel is None:
+            kernel = lambda x1, x2: (np.exp(-\
+                    sp.distance.cdist(x1, x2, 'sqeuclidean')/(2)) + \
+                    0*np.eye(x1.shape[0])).astype(np.float32)
+        self.kernel = kernel
 
     def _init_layers(self, x_init, y_init):
         self.linear1 = nn.Linear(self.num_in, self.width, bias=False)
@@ -48,11 +56,9 @@ class FullyConnectedLayer(nn.Module):
 
         if not (x_init is None):
             x = x_init[0]; x_star = x_init[1]
-            kernel = lambda x1, x2: (np.exp(-\
-                    sp.distance.cdist(x1, x2, 'sqeuclidean')/(2)) + \
-                    0*np.eye(x1.shape[0])).astype(np.float32)
+
             T = 5
-            K = kernel(x.T, x.T)/T
+            K = self.kernel(x.T, x.T)/T
             lamb = (np.linalg.norm(K)/8)
             evals = np.linalg.eigvals(K/(T*lamb))
             
@@ -62,7 +68,7 @@ class FullyConnectedLayer(nn.Module):
 
             x0 = torch.zeros_like(x)
 
-            K_star = kernel(x_star.T, x.T)/T
+            K_star = self.kernel(x_star.T, x.T)/T
 
             neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb*T))
             K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb*T))

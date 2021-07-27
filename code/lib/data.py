@@ -2,6 +2,8 @@ import numpy as np
 import scipy.spatial as sp
 import torch
 
+
+# TODO make SyntheticData abstract class
 class SequenceOneDimension(object):
     def __init__(self, xmin, xmax, dimension_y, offset, noise_var):
         self.xmin = xmin
@@ -25,7 +27,7 @@ class SequenceOneDimension(object):
         return samples
 
     def sample_inputs_targets(self, num_samples, target_fun, 
-            normalise_x = True, normalise_y = True, as_torch=True):
+            normalise_x = False, normalise_y = False, as_torch=True):
         X_input = np.tile(np.linspace(-2*np.pi, 2*np.pi, self.dimension_y),
                     [num_samples, 1])
         X_target = np.tile(np.linspace(-2*np.pi-self.offset, 2*np.pi-self.offset, 
@@ -46,6 +48,12 @@ class SequenceOneDimension(object):
             std = np.std(Y_input, axis=1).reshape((-1,1))
             Y_input = (Y_input - mean)/std
             Y_target = (Y_target - mean)/std
+
+        if normalise_x:
+            mean = np.mean(X_input, axis=1).reshape((-1,1))
+            std = np.std(X_input, axis=1).reshape((-1,1))
+            X_input = (X_input - mean)/std
+            X_target = (X_target - mean)/std
         
         if as_torch:
             f = lambda x: torch.from_numpy(x.astype(np.float32))
@@ -53,5 +61,32 @@ class SequenceOneDimension(object):
             f = lambda x: x
 
         return [f(X_input), f(Y_input), f(X_target), f(Y_target)]
+
+class CopyMemory(object):
+    def __init__(self, T):
+        self.T = T
+
+    def sample_inputs_targets(self, num_samples, normalise_x = False,
+            normalise_y = False, as_torch=True):
+        y_input = np.zeros((num_samples, self.T+20))
+        y_input[:, 0:10] = np.random.randint(1, 9, size=(num_samples, 10))
+        y_input[:, self.T+10] = 9
+        
+        y_target = np.zeros((num_samples, self.T+20))
+        y_target[:, self.T+10:] = y_input[:,0:10]
+
+        x_input = np.arange(0, self.T+20, 1).reshape((1, -1))
+        x_input = np.tile(x_input, [num_samples, 1])
+        x_target = np.arange(-self.T-10, 10, 1).reshape((1, -1))
+        x_target = np.tile(x_target, [num_samples, 1])
+
+        if as_torch:
+            f = lambda x: torch.from_numpy(x.astype(np.float32))
+        else:
+            f = lambda x: x
+
+        return [f(x_input), f(y_input), f(x_target), f(y_target)]
+
+
         
 
