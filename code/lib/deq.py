@@ -38,8 +38,7 @@ class FullyConnectedLayer(nn.Module):
     def _init_kernel(self, kernel):
         if kernel is None:
             kernel = lambda x1, x2: (np.exp(-\
-                    sp.distance.cdist(x1, x2, 'sqeuclidean')/(2)) + \
-                    0*np.eye(x1.shape[0])).astype(np.float32)
+                    sp.distance.cdist(x1, x2, 'sqeuclidean')/(2)))
         self.kernel = kernel
 
     def _init_layers(self, x_init, y_init):
@@ -57,8 +56,8 @@ class FullyConnectedLayer(nn.Module):
         if not (x_init is None):
             x = x_init[0]; x_star = x_init[1]
 
-            T = 5
-            K = self.kernel(x.T, x.T)/T
+            T = 8
+            K = self.kernel(x.numpy().T, x.numpy().T)/T
             lamb = (np.linalg.norm(K)/8)
             evals = np.linalg.eigvals(K/(T*lamb))
             
@@ -67,8 +66,7 @@ class FullyConnectedLayer(nn.Module):
             print(lamb)
 
             x0 = torch.zeros_like(x)
-
-            K_star = self.kernel(x_star.T, x.T)/T
+            K_star = self.kernel(x_star.numpy().T, x.numpy().T)/T
 
             neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb*T))
             K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb*T))
@@ -85,8 +83,9 @@ class FullyConnectedLayer(nn.Module):
 
     def _init_activation(self, activation):
         if activation is None:
-            #activation = torch.nn.Identity()
             activation = lambda z: torch.nn.Tanh()(z)
+            #activation = torch.nn.Identity()
+            #activation = lambda z: torch.exp(z)
             #activation = torch.nn.Sigmoid()
             #activation = torch.erf
             #activation = torch.nn.ReLU()

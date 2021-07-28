@@ -19,9 +19,8 @@ NUM_TRAIN   = 200
 NUM_TEST    = 20
 MEM_LENGTH  = 400
 NUM_PLOT    = 100
-MAX_EPOCHS  = 300
+MAX_EPOCHS  = 3000
 PLOT        = True
-TARGET_FUN  = lambda x: (np.exp(-0.1*np.abs(x)**2) * np.sin(x) + np.exp(-(x+9)**2))
 OFFSET      = 2
 OUTPUT_DIR  = 'outputs/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
@@ -33,17 +32,18 @@ np.random.seed(SEED)
 ################################## Load regression data
 train_data = CopyMemory(MEM_LENGTH)
 X_train_input, Y_train_input, X_train_target, Y_train_target = \
-        train_data.sample_inputs_targets(NUM_TRAIN)
+        train_data.sample_inputs_targets(NUM_TRAIN,normalise_x=True)
 
 test_data = CopyMemory(MEM_LENGTH)
 X_test_input, Y_test_input, X_test_target, Y_test_target = \
-        test_data.sample_inputs_targets(NUM_TEST)
+        test_data.sample_inputs_targets(NUM_TEST,normalise_x=True)
 
 plot_data = CopyMemory(MEM_LENGTH)
 X_plot_input, Y_plot_input, X_plot_target, Y_plot_target = \
-        plot_data.sample_inputs_targets(NUM_PLOT)
+        plot_data.sample_inputs_targets(NUM_PLOT,normalise_x=True)
 
 markers = ['-', '--']
+activations = [torch.nn.Sigmoid(), torch.nn.Sigmoid()]
 error_fig = plt.figure()
 # train/test error curves for standard and our init
 experiment_data = np.zeros((4, MAX_EPOCHS)) 
@@ -58,9 +58,14 @@ for m_idx, initialise_as_glm in enumerate([True, False]):
         x_init = None
         y_init = None
         save_dir = 'not_glm_init/'
+
+    cos_ker = lambda x1, x2: x1 @ x2.T / \
+            (np.linalg.norm(x1, axis=1)*np.linalg.norm(x2.T, axis=0))
+    k_delta = lambda x1, x2: (cos_ker(x1, x2) == 1).astype(np.float32)
+    #k_delta = None
     f = FullyConnectedLayer(MEM_LENGTH+20, MEM_LENGTH+20, MEM_LENGTH+20, 
             x_init = x_init, y_init = y_init, 
-            kernel = None)#lambda x1, x2: np.all(x1 == x2))
+            kernel = k_delta, activation=activations[m_idx])
 
     model = DEQGLM(f, solver=None, tol=1e-2, max_iter=25, m=5)
 
@@ -101,22 +106,21 @@ for m_idx, initialise_as_glm in enumerate([True, False]):
     if PLOT:
         matplotlib_config()
 
-        xlim = [-2*np.pi-OFFSET, 2*np.pi]
-        ylim = [-5, 5]
+
         plot_1d_sequence_data(X_train_input, Y_train_input, 
-                X_plot_input, Y_plot_input, save_dir + 'plot_input_train.pdf', xlim, ylim)
+                X_plot_input, Y_plot_input, save_dir + 'plot_input_train.pdf')
         plot_1d_sequence_data(X_train_target, Y_train_target, 
-                X_plot_target, Y_plot_target, save_dir + 'plot_target_train.pdf', xlim, ylim)
+                X_plot_target, Y_plot_target, save_dir + 'plot_target_train.pdf')
         pred = model(Y_train_input).detach().numpy()
         plot_1d_sequence_data(X_train_target, pred, 
-                X_plot_target, Y_plot_target, save_dir + 'plot_target_train_pred.pdf', xlim, ylim)
+                X_plot_target, Y_plot_target, save_dir + 'plot_target_train_pred.pdf')
         plot_1d_sequence_data(X_test_input, Y_test_input, 
-                X_plot_input, Y_plot_input, save_dir + 'plot_input_test.pdf', xlim, ylim)
+                X_plot_input, Y_plot_input, save_dir + 'plot_input_test.pdf')
         plot_1d_sequence_data(X_test_target, Y_test_target, 
-                X_plot_target, Y_plot_target, save_dir + 'plot_target_test.pdf', xlim, ylim)
+                X_plot_target, Y_plot_target, save_dir + 'plot_target_test.pdf')
         pred = model(Y_test_input).detach().numpy()
         plot_1d_sequence_data(X_test_target, pred, 
-                X_plot_target, Y_plot_target, save_dir + 'plot_target_test_pred.pdf', xlim, ylim)
+                X_plot_target, Y_plot_target, save_dir + 'plot_target_test_pred.pdf')
 
         # Plot error curves
         plt.figure(error_fig.number)

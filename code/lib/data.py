@@ -68,6 +68,8 @@ class CopyMemory(object):
 
     def sample_inputs_targets(self, num_samples, normalise_x = False,
             normalise_y = False, as_torch=True):
+        assert normalise_y == False
+
         y_input = np.zeros((num_samples, self.T+20))
         y_input[:, 0:10] = np.random.randint(1, 9, size=(num_samples, 10))
         y_input[:, self.T+10] = 9
@@ -79,6 +81,12 @@ class CopyMemory(object):
         x_input = np.tile(x_input, [num_samples, 1])
         x_target = np.arange(-self.T-10, 10, 1).reshape((1, -1))
         x_target = np.tile(x_target, [num_samples, 1])
+
+        if normalise_x:
+            mean = np.mean(x_target, axis=1).reshape((-1,1))
+            std = np.std(x_target, axis=1).reshape((-1,1))
+            x_input = (x_input - mean)/std
+            x_target = (x_target - mean)/std
 
         if as_torch:
             f = lambda x: torch.from_numpy(x.astype(np.float32))
