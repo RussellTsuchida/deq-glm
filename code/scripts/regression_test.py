@@ -57,14 +57,12 @@ for m_idx, initialise_as_glm in enumerate([True, False]):
     ################################## Initialise the Model
     if initialise_as_glm:
         x_init = [X_train_input, X_train_target]
-        y_init = Y_train_input
         save_dir = 'glm_init/'
     else:
         x_init = None
-        y_init = None
         save_dir = 'not_glm_init/'
     f = FullyConnectedLayer(DIMENSION_Y, DIMENSION_Y, DIMENSION_Y, 
-            x_init = x_init, y_init = y_init)
+            x_init = x_init)
     #model = nn.Sequential(DEQFixedPoint(f, solver=None, tol=1e-2, max_iter=25, m=5),
     #        f.linear3).to(device)
     model = DEQGLM(f, solver=None, tol=1e-2, max_iter=25, m=5)
