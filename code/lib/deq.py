@@ -25,8 +25,13 @@ class ResNetLayer(nn.Module):
         return self.norm3(F.relu(z + self.norm2(x + self.conv2(y))))
 
 class FullyConnectedLayer(nn.Module):
-    def __init__(self, num_in, width, num_out, activation=None, x_init=None, 
+    def __init__(self, num_in, width, num_out, activation=None, x_init=False, 
             kernel=None):
+        """
+        x_init (Bool or list(Torch Tensor)): If False, use random 
+            initialisation. If True, use naive initialisation. If a list
+            of pytorch tensors, use these to initialise the kernel matrix.
+        """
         super().__init__()
         self.num_in = num_in
         self.num_out = num_out
@@ -50,34 +55,45 @@ class FullyConnectedLayer(nn.Module):
         self.linear2.bias = nn.parameter.Parameter(torch.zeros((self.width)))
         self.linear3.bias = nn.parameter.Parameter(torch.zeros((self.num_out)))
 
-        self.linear4.weight = nn.parameter.Parameter(torch.zeros((self.num_in, self.num_out)))
+        self.linear4.weight = \
+            nn.parameter.Parameter(torch.zeros((self.num_in, self.num_out)))
         self.linear4.weight.requires_grad = False
 
-        if not (x_init is None):
-            x = x_init[0]; x_star = x_init[1]
+        if not (x_init is False):
+            if (x_init == True):
+                x_in = np.arange(0, self.num_in, 1).reshape((1,-1))
+                x_out = np.arange(0, self.num_out, 1).reshape((1,-1))
+                x_init = [torch.from_numpy(\
+                np.tile(x_in/self.num_in, [self.width, 1])),
+                    torch.from_numpy(\
+                    np.tile(x_out/self.num_in, [self.width, 1]))]
+            self._informed_init(x_init)
 
-            T = 8
-            K = self.kernel(x.numpy().T, x.numpy().T)/T
-            lamb = (np.linalg.norm(K)/8)
-            evals = np.linalg.eigvals(K/(T*lamb))
-            
-            print(np.linalg.det(K/(T*lamb)))
-            print(np.linalg.norm(K/(lamb*T)))
-            print(lamb)
+    def _informed_init(self, x_init):
+        x = x_init[0]; x_star = x_init[1]
 
-            x0 = torch.zeros_like(x)
-            K_star = self.kernel(x_star.numpy().T, x.numpy().T)/T
+        T = 8
+        K = self.kernel(x.numpy().T, x.numpy().T)/T
+        lamb = (np.linalg.norm(K)/8)
+        evals = np.linalg.eigvals(K/(T*lamb))
+        
+        print(np.linalg.det(K/(T*lamb)))
+        print(np.linalg.norm(K/(lamb*T)))
+        print(lamb)
 
-            neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb*T))
-            K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb*T))
-            
-            self.linear1.weight = nn.parameter.Parameter(neg_K_norm(K))
-            self.linear2.weight = nn.parameter.Parameter(K_norm(K))
-            
-            self.linear3.weight = nn.parameter.Parameter(neg_K_norm(T*K_star))
-            self.linear4.weight = nn.parameter.Parameter(K_norm(T*K_star))
+        x0 = torch.zeros_like(x)
+        K_star = self.kernel(x_star.numpy().T, x.numpy().T)/T
 
-            self.linear4.weight.requires_grad = True
+        neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb*T))
+        K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb*T))
+        
+        self.linear1.weight = nn.parameter.Parameter(neg_K_norm(K))
+        self.linear2.weight = nn.parameter.Parameter(K_norm(K))
+        
+        self.linear3.weight = nn.parameter.Parameter(neg_K_norm(T*K_star))
+        self.linear4.weight = nn.parameter.Parameter(K_norm(T*K_star))
+
+        self.linear4.weight.requires_grad = True
 
     def _init_activation(self, activation):
         if activation is None:

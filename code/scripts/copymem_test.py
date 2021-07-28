@@ -21,7 +21,6 @@ MEM_LENGTH  = 400
 NUM_PLOT    = 100
 MAX_EPOCHS  = 100
 PLOT        = False
-OFFSET      = 2
 OUTPUT_DIR  = 'outputs/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
 
@@ -42,19 +41,22 @@ plot_data = CopyMemory(MEM_LENGTH)
 X_plot_input, Y_plot_input, X_plot_target, Y_plot_target = \
         plot_data.sample_inputs_targets(NUM_PLOT,normalise_x=True)
 
-markers = ['-', '--']
-activations = [torch.nn.Sigmoid(), torch.nn.Sigmoid()]
+markers = ['-', '--', '-.']
+activations = [torch.nn.Sigmoid(), torch.nn.Sigmoid(), torch.nn.Sigmoid()]
 error_fig = plt.figure()
 # train/test error curves for standard and our init
-experiment_data = np.zeros((4, MAX_EPOCHS)) 
+experiment_data = np.zeros((6, MAX_EPOCHS)) 
 
-for m_idx, initialise_as_glm in enumerate([True, False]):
+for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
     ################################## Initialise the Model
-    if initialise_as_glm:
+    if initialise_as_glm == 'informed':
         x_init = [X_train_input, X_train_target]
-        save_dir = 'glm_init/'
+        save_dir = 'glm_init_informed/'
+    elif initialise_as_glm == 'naive':
+        x_init = True
+        save_dir = 'glm_init_naive/'
     else:
-        x_init = None
+        x_init = False
         save_dir = 'not_glm_init/'
 
     cos_ker = lambda x1, x2: x1 @ x2.T / \
@@ -67,7 +69,7 @@ for m_idx, initialise_as_glm in enumerate([True, False]):
     model = DEQGLM(f, solver=None, tol=1e-2, max_iter=25, m=5)
 
     ################################## One training or testing iteration
-    def epoch(data, model, opt=None, lr_scheduler=None):
+    def epoch(data, model, opt=None):
         total_loss = 0.
         model.eval() if opt is None else model.train()
 
@@ -79,8 +81,6 @@ for m_idx, initialise_as_glm in enumerate([True, False]):
             opt.zero_grad()
             loss.backward()
             opt.step()
-            if not (lr_scheduler is None):
-                lr_scheduler.step()
         
         total_loss += loss.item() * list(X.shape)[0]
 
@@ -90,19 +90,15 @@ for m_idx, initialise_as_glm in enumerate([True, False]):
     opt = optim.Adam(model.parameters(), lr=1e-3)
     print("# Parmeters: ", sum(a.numel() for a in model.parameters()))
 
-
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, MAX_EPOCHS*NUM_TRAIN, eta_min=1e-6)
-    scheduler = None
     train_err = np.zeros((MAX_EPOCHS,))
     test_err = np.zeros((MAX_EPOCHS,))
     for i in range(MAX_EPOCHS):
         print(i)
-        train_err[i] = epoch([Y_train_input, Y_train_target], model, opt, scheduler)
+        train_err[i] = epoch([Y_train_input, Y_train_target], model, opt)
         test_err[i] = epoch([Y_test_input, Y_test_target], model)
     
     if PLOT:
         matplotlib_config()
-
 
         plot_1d_sequence_data(X_train_input, Y_train_input, 
                 X_plot_input, Y_plot_input, save_dir + 'plot_input_train.pdf')
