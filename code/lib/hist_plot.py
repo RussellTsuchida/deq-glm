@@ -50,21 +50,25 @@ def _read_csvs(file_dir):
     return all_data
 
 if __name__ == '__main__':
-    DIR = 'outputs/noise_var_05/'
-    #DIR = 'outputs/'
+    #DIR = 'outputs/noise_var_05/'
+    DIR = 'outputs/'
     matplotlib_config()
 
     plot_experiment_hist_one_row(DIR, row=1, colour='b', mode='all')
     plot_experiment_hist_one_row(DIR, row=3, colour='r', mode='all')
+    plot_experiment_hist_one_row(DIR, row=5, colour='g', mode='all')
 
     plot_experiment_hist_one_row(DIR, row=1, colour='b', mode='min')
     plot_experiment_hist_one_row(DIR, row=3, colour='r', mode='min')
+    plot_experiment_hist_one_row(DIR, row=5, colour='g', mode='min')
 
     plot_experiment_hist_one_row(DIR, row=1, colour='b', mode='max')
     plot_experiment_hist_one_row(DIR, row=3, colour='r', mode='max')
+    plot_experiment_hist_one_row(DIR, row=5, colour='g', mode='max')
 
     plot_experiment_hist_one_row(DIR, row=1, colour='b', mode='mean')
     plot_experiment_hist_one_row(DIR, row=3, colour='r', mode='mean')
+    plot_experiment_hist_one_row(DIR, row=5, colour='g', mode='mean')
 
     plt.legend()
     plt.xlabel('Training epoch')
