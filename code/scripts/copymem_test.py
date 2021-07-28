@@ -15,16 +15,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
-NUM_TRAIN   = 200
-NUM_TEST    = 20
+NUM_TRAIN   = 20000
+NUM_TEST    = 2000
 MEM_LENGTH  = 400
 NUM_PLOT    = 100
-MAX_EPOCHS  = 100
+MAX_EPOCHS  = 4000
 PLOT        = False
 OUTPUT_DIR  = 'outputs/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#print(device)
 torch.manual_seed(SEED)
 np.random.seed(SEED)
 
@@ -49,9 +50,13 @@ experiment_data = np.zeros((6, MAX_EPOCHS))
 
 for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
     ################################## Initialise the Model
+    kernel = None
     if initialise_as_glm == 'informed':
         x_init = [X_train_input, X_train_target]
         save_dir = 'glm_init_informed/'
+        cos_ker = lambda x1, x2: x1 @ x2.T / \
+                (np.linalg.norm(x1, axis=1)*np.linalg.norm(x2.T, axis=0))
+        kernel = lambda x1, x2: ( np.abs(cos_ker(x1, x2) - 1) <= 1e-4).astype(np.float32)
     elif initialise_as_glm == 'naive':
         x_init = True
         save_dir = 'glm_init_naive/'
@@ -59,12 +64,8 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
         x_init = False
         save_dir = 'not_glm_init/'
 
-    cos_ker = lambda x1, x2: x1 @ x2.T / \
-            (np.linalg.norm(x1, axis=1)*np.linalg.norm(x2.T, axis=0))
-    k_delta = lambda x1, x2: (cos_ker(x1, x2) == 1).astype(np.float32)
-    #k_delta = None
     f = FullyConnectedLayer(MEM_LENGTH+20, MEM_LENGTH+20, MEM_LENGTH+20, 
-            x_init = x_init, kernel = k_delta, activation=activations[m_idx])
+            x_init = x_init, kernel = kernel, activation=activations[m_idx])
 
     model = DEQGLM(f, solver=None, tol=1e-2, max_iter=25, m=5)
 
@@ -93,7 +94,7 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
     train_err = np.zeros((MAX_EPOCHS,))
     test_err = np.zeros((MAX_EPOCHS,))
     for i in range(MAX_EPOCHS):
-        print(i)
+        print(i, flush=True)
         train_err[i] = epoch([Y_train_input, Y_train_target], model, opt)
         test_err[i] = epoch([Y_test_input, Y_test_target], model)
     
