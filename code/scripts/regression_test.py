@@ -14,14 +14,16 @@ from torch.utils.data import DataLoader
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
+import scipy.spatial as sp
 
-NUM_TRAIN   = 100
-NUM_TEST    = 5000
+#TODO: something wrong. If NUM_TRAIN is 20000, things break
+NUM_TRAIN   = 200
+NUM_TEST    = 200
 NUM_PLOT    = 100
 DIMENSION_Y = 100
-NOISE_VAR   = 0.4
-MAX_EPOCHS  = 300
-PLOT        = False
+NOISE_VAR   = 0.01
+MAX_EPOCHS  = 0
+PLOT        = True
 TARGET_FUN  = lambda x: (np.exp(-0.1*np.abs(x)**2) * np.sin(x) + np.exp(-(x+9)**2))
 OFFSET      = 2
 OUTPUT_DIR  = 'outputs/'
@@ -47,24 +49,27 @@ plot_data = SequenceOneDimension(-2*np.pi, 2*np.pi, DIMENSION_Y, OFFSET,
 X_plot_input, Y_plot_input, X_plot_target, Y_plot_target = \
         plot_data.sample_inputs_targets(NUM_PLOT, TARGET_FUN)
 
-
-markers = ['-', '--']
+markers = ['-', '--', '-.']
 error_fig = plt.figure()
 # train/test error curves for standard and our init
-experiment_data = np.zeros((4, MAX_EPOCHS)) 
+experiment_data = np.zeros((6, MAX_EPOCHS)) 
 
-for m_idx, initialise_as_glm in enumerate([True, False]):
+for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
     ################################## Initialise the Model
-    if initialise_as_glm:
-        x_init = [X_train_input, X_train_target]
-        save_dir = 'glm_init/'
+    kernel = None
+    if initialise_as_glm == 'informed':
+        x_init = [X_train_input[0:1,:], X_train_target[0:1,:]]
+        save_dir = 'glm_init_informed/'
+        kernel = lambda x1, x2: np.exp(-sp.distance.cdist(x1, x2, 
+            'sqeuclidean')/2).astype(np.float32)
+    elif initialise_as_glm == 'naive':
+        x_init = True
+        save_dir = 'glm_init_naive/'
     else:
-        x_init = None
+        x_init = False
         save_dir = 'not_glm_init/'
     f = FullyConnectedLayer(DIMENSION_Y, DIMENSION_Y, DIMENSION_Y, 
-            x_init = x_init)
-    #model = nn.Sequential(DEQFixedPoint(f, solver=None, tol=1e-2, max_iter=25, m=5),
-    #        f.linear3).to(device)
+            x_init = x_init, kernel=kernel)
     model = DEQGLM(f, solver=None, tol=1e-2, max_iter=25, m=5)
 
     ################################## One training or testing iteration
@@ -75,7 +80,6 @@ for m_idx, initialise_as_glm in enumerate([True, False]):
         X, y = data
         yp = model(X)
         loss = nn.MSELoss()(yp,y)
-        #loss = nn.L1Loss()(yp,y)
         if opt:
             opt.zero_grad()
             loss.backward()

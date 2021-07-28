@@ -43,7 +43,8 @@ class FullyConnectedLayer(nn.Module):
     def _init_kernel(self, kernel):
         if kernel is None:
             kernel = lambda x1, x2: (np.exp(-\
-                    sp.distance.cdist(x1, x2, 'sqeuclidean')/(2)))
+                    sp.distance.cdist(x1, x2, 'sqeuclidean')/(2))).\
+                    astype(np.float32)
         self.kernel = kernel
 
     def _init_layers(self, x_init):
@@ -63,20 +64,17 @@ class FullyConnectedLayer(nn.Module):
             if (x_init == True):
                 x_in = np.arange(0, self.num_in, 1).reshape((1,-1))
                 x_out = np.arange(0, self.num_out, 1).reshape((1,-1))
-                x_init = [torch.from_numpy(\
-                np.tile(x_in/self.num_in, [self.width, 1])),
-                    torch.from_numpy(\
-                    np.tile(x_out/self.num_in, [self.width, 1]))]
+                x_init = [torch.from_numpy(x_in), torch.from_numpy(x_out)]
             self._informed_init(x_init)
 
     def _informed_init(self, x_init):
         x = x_init[0]; x_star = x_init[1]
 
-        T = 8
+        T = 5
         K = self.kernel(x.numpy().T, x.numpy().T)/T
-        lamb = (np.linalg.norm(K)/8)
+        lamb = (np.linalg.norm(K)/5)
         evals = np.linalg.eigvals(K/(T*lamb))
-        
+
         print(np.linalg.det(K/(T*lamb)))
         print(np.linalg.norm(K/(lamb*T)))
         print(lamb)
