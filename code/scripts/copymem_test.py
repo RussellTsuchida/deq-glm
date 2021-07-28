@@ -19,8 +19,8 @@ NUM_TRAIN   = 200
 NUM_TEST    = 20
 MEM_LENGTH  = 400
 NUM_PLOT    = 100
-MAX_EPOCHS  = 3000
-PLOT        = True
+MAX_EPOCHS  = 100
+PLOT        = False
 OFFSET      = 2
 OUTPUT_DIR  = 'outputs/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
@@ -52,11 +52,9 @@ for m_idx, initialise_as_glm in enumerate([True, False]):
     ################################## Initialise the Model
     if initialise_as_glm:
         x_init = [X_train_input, X_train_target]
-        y_init = Y_train_input
         save_dir = 'glm_init/'
     else:
         x_init = None
-        y_init = None
         save_dir = 'not_glm_init/'
 
     cos_ker = lambda x1, x2: x1 @ x2.T / \
@@ -64,8 +62,7 @@ for m_idx, initialise_as_glm in enumerate([True, False]):
     k_delta = lambda x1, x2: (cos_ker(x1, x2) == 1).astype(np.float32)
     #k_delta = None
     f = FullyConnectedLayer(MEM_LENGTH+20, MEM_LENGTH+20, MEM_LENGTH+20, 
-            x_init = x_init, y_init = y_init, 
-            kernel = k_delta, activation=activations[m_idx])
+            x_init = x_init, kernel = k_delta, activation=activations[m_idx])
 
     model = DEQGLM(f, solver=None, tol=1e-2, max_iter=25, m=5)
 

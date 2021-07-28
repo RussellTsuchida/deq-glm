@@ -26,14 +26,14 @@ class ResNetLayer(nn.Module):
 
 class FullyConnectedLayer(nn.Module):
     def __init__(self, num_in, width, num_out, activation=None, x_init=None, 
-            y_init=None, kernel=None):
+            kernel=None):
         super().__init__()
         self.num_in = num_in
         self.num_out = num_out
         self.width  = width
         self._init_kernel(kernel)
         self._init_activation(activation)
-        self._init_layers(x_init, y_init)
+        self._init_layers(x_init)
 
     def _init_kernel(self, kernel):
         if kernel is None:
@@ -41,7 +41,7 @@ class FullyConnectedLayer(nn.Module):
                     sp.distance.cdist(x1, x2, 'sqeuclidean')/(2)))
         self.kernel = kernel
 
-    def _init_layers(self, x_init, y_init):
+    def _init_layers(self, x_init):
         self.linear1 = nn.Linear(self.num_in, self.width, bias=False)
         self.linear2 = nn.Linear(self.num_in, self.width)
         self.linear3 = nn.Linear(self.width, self.num_out)
@@ -78,8 +78,6 @@ class FullyConnectedLayer(nn.Module):
             self.linear4.weight = nn.parameter.Parameter(K_norm(T*K_star))
 
             self.linear4.weight.requires_grad = True
-            #y_av = torch.mean(y_init, dim=0)
-            #self.linear3.bias = nn.parameter.Parameter(K_norm(T*K_star) @ y_av)
 
     def _init_activation(self, activation):
         if activation is None:
