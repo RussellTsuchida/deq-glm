@@ -48,6 +48,7 @@ class FullyConnectedLayer(nn.Module):
         self.kernel = kernel
 
     def _init_layers(self, x_init):
+        self.x_init = x_init
         self.linear1 = nn.Linear(self.num_in, self.width, bias=False)
         self.linear2 = nn.Linear(self.num_in, self.width)
         self.linear3 = nn.Linear(self.width, self.num_out)
@@ -62,9 +63,12 @@ class FullyConnectedLayer(nn.Module):
 
         if not (x_init is False):
             if (x_init == True):
-                x_in = np.linspace(-2*np.pi, 2*np.pi, self.num_in).reshape((1,-1))
-                x_out = np.linspace(-2*np.pi, 2*np.pi, self.num_out).reshape((1,-1))
-                x_init = [torch.from_numpy(x_in), torch.from_numpy(x_out)]
+                x_in = torch.from_numpy(\
+                        np.linspace(-2*np.pi, 2*np.pi, self.num_in).reshape((1,-1)))
+                #x_out = torch.from_numpy(\
+                #        np.linspace(-2*np.pi, 2*np.pi, self.num_out).reshape((1,-1)))
+                x_out = None
+                x_init = [x_in, x_out]
             self._informed_init(x_init)
 
     def _informed_init(self, x_init):
@@ -80,23 +84,22 @@ class FullyConnectedLayer(nn.Module):
         print(lamb)
 
         x0 = torch.zeros_like(x)
-        K_star = self.kernel(x_star.numpy().T, x.numpy().T)/T
-
         neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb*T))
         K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb*T))
         
         self.linear1.weight = nn.parameter.Parameter(neg_K_norm(K))
         self.linear2.weight = nn.parameter.Parameter(K_norm(K))
         
-        self.linear3.weight = nn.parameter.Parameter(neg_K_norm(T*K_star))
-        self.linear4.weight = nn.parameter.Parameter(K_norm(T*K_star))
-
+        if not (x_star is None):
+            K_star = self.kernel(x_star.numpy().T, x.numpy().T)/T
+            self.linear3.weight = nn.parameter.Parameter(neg_K_norm(T*K_star))
+            self.linear4.weight = nn.parameter.Parameter(K_norm(T*K_star))
         self.linear4.weight.requires_grad = True
 
     def _init_activation(self, activation):
         if activation is None:
-            #activation = lambda z: torch.nn.Tanh()(z)
-            activation = torch.nn.Identity()
+            activation = lambda z: torch.nn.Tanh()(z)
+            #activation = torch.nn.Identity()
             #activation = lambda z: torch.exp(z)
             #activation = torch.nn.Sigmoid()
             #activation = torch.erf
@@ -183,8 +186,10 @@ class DEQFixedPoint(nn.Module):
                     lambda y: autograd.grad(f0, z0, y, 
                         retain_graph=True)[0] + grad, grad, **self.kwargs)
             return g
-                
-        z.register_hook(backward_hook)
+        try:
+            z.register_hook(backward_hook)
+        except:
+            print('warning')
         return z
 
 class DEQGLM(nn.Module):
