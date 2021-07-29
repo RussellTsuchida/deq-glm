@@ -6,8 +6,8 @@ import torch
 # TODO make SyntheticData abstract class
 class SequenceOneDimension(object):
     def __init__(self, xmin, xmax, dimension_y, offset, noise_var):
-        self.xmin = xmin
-        self.xmax = xmax
+        self.x_min = xmin
+        self.x_max = xmax
         self.dimension_y = dimension_y
         self.offset = offset
         self.noise_var = noise_var
@@ -17,7 +17,12 @@ class SequenceOneDimension(object):
         if self.K is None:
             if kernel is None:
                 kernel = lambda x1, x2: self.noise_var*\
+                        np.exp(-sp.distance.cdist(x1, x2, 'sqeuclidean')/2)*\
+                        np.exp(-np.sin(sp.distance.cdist(x1, x2, 'euclidean'))**2)
+                """
+                kernel = lambda x1, x2: self.noise_var*\
                         np.exp(-sp.distance.cdist(x1, x2, 'sqeuclidean')/2)
+                """
             self.K = kernel(x, x)
 
         # Generate a (num_samples, x.shape[0]) np array of samples
@@ -28,9 +33,9 @@ class SequenceOneDimension(object):
 
     def sample_inputs_targets(self, num_samples, target_fun, 
             normalise_x = False, normalise_y = False, as_torch=True):
-        X_input = np.tile(np.linspace(-2*np.pi, 2*np.pi, self.dimension_y),
+        X_input = np.tile(np.linspace(self.x_min, self.x_max, self.dimension_y),
                     [num_samples, 1])
-        X_target = np.tile(np.linspace(-2*np.pi-self.offset, 2*np.pi-self.offset, 
+        X_target = np.tile(np.linspace(self.x_min-self.offset, self.x_max-self.offset, 
             self.dimension_y), [num_samples, 1])
 
         x_both = np.hstack((X_input[0,:], X_target[0,:])).reshape((-1,1))
@@ -44,16 +49,27 @@ class SequenceOneDimension(object):
         Y_target = target_fun(X_target) + gp_target
 
         if normalise_y:
-            mean = np.mean(Y_input, axis=1).reshape((-1,1))
-            std = np.std(Y_input, axis=1).reshape((-1,1))
+            if (normalise_y == True):
+                mean = np.mean(Y_input)
+                std = np.std(Y_input)
+            else:
+                mean = normalise_y[0]; std = normalise_y[1]
             Y_input = (Y_input - mean)/std
             Y_target = (Y_target - mean)/std
 
+            self.mean_y = mean
+            self.std_y = std
+
         if normalise_x:
-            mean = np.mean(X_input, axis=1).reshape((-1,1))
-            std = np.std(X_input, axis=1).reshape((-1,1))
+            if (normalise_x == True):
+                mean = np.mean(X_input)
+                std = np.std(X_input)
+            else:
+                mean = normalise_x[0]; std = normalise_x[1]
             X_input = (X_input - mean)/std
             X_target = (X_target - mean)/std
+            self.mean_x = mean
+            self.std_x = std
         
         if as_torch:
             f = lambda x: torch.from_numpy(x.astype(np.float32))

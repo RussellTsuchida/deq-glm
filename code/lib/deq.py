@@ -43,7 +43,7 @@ class FullyConnectedLayer(nn.Module):
     def _init_kernel(self, kernel):
         if kernel is None:
             kernel = lambda x1, x2: (np.exp(-\
-                    sp.distance.cdist(x1, x2, 'sqeuclidean')/(2))).\
+                    sp.distance.cdist(x1, x2, 'sqeuclidean')/2)).\
                     astype(np.float32)
         self.kernel = kernel
 
@@ -62,8 +62,8 @@ class FullyConnectedLayer(nn.Module):
 
         if not (x_init is False):
             if (x_init == True):
-                x_in = np.arange(0, self.num_in, 1).reshape((1,-1))
-                x_out = np.arange(0, self.num_out, 1).reshape((1,-1))
+                x_in = np.linspace(-2*np.pi, 2*np.pi, self.num_in).reshape((1,-1))
+                x_out = np.linspace(-2*np.pi, 2*np.pi, self.num_out).reshape((1,-1))
                 x_init = [torch.from_numpy(x_in), torch.from_numpy(x_out)]
             self._informed_init(x_init)
 
@@ -95,8 +95,8 @@ class FullyConnectedLayer(nn.Module):
 
     def _init_activation(self, activation):
         if activation is None:
-            activation = lambda z: torch.nn.Tanh()(z)
-            #activation = torch.nn.Identity()
+            #activation = lambda z: torch.nn.Tanh()(z)
+            activation = torch.nn.Identity()
             #activation = lambda z: torch.exp(z)
             #activation = torch.nn.Sigmoid()
             #activation = torch.erf

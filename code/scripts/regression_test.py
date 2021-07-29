@@ -16,15 +16,14 @@ import matplotlib.pyplot as plt
 import sys
 import scipy.spatial as sp
 
-#TODO: something wrong. If NUM_TRAIN is 20000, things break
-NUM_TRAIN   = 200
-NUM_TEST    = 200
-NUM_PLOT    = 100
+NUM_TRAIN   = 20000
+NUM_TEST    = 2000
 DIMENSION_Y = 100
-NOISE_VAR   = 0.01
-MAX_EPOCHS  = 0
+NOISE_VAR   = 0.1
+MAX_EPOCHS  = 100
 PLOT        = True
-TARGET_FUN  = lambda x: (np.exp(-0.1*np.abs(x)**2) * np.sin(x) + np.exp(-(x+9)**2))
+TARGET_FUN  = lambda x: (np.exp(-0.1*np.abs(x)**2)*np.sin(x) \
+        + np.exp(-(x+9)**2))
 OFFSET      = 2
 OUTPUT_DIR  = 'outputs/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
@@ -37,17 +36,22 @@ np.random.seed(SEED)
 train_data = SequenceOneDimension(-2*np.pi, 2*np.pi, DIMENSION_Y, OFFSET,
         NOISE_VAR)
 X_train_input, Y_train_input, X_train_target, Y_train_target = \
-        train_data.sample_inputs_targets(NUM_TRAIN, TARGET_FUN)
+        train_data.sample_inputs_targets(NUM_TRAIN, TARGET_FUN,
+                normalise_y = True, normalise_x = False)
 
 test_data = SequenceOneDimension(-2*np.pi, 2*np.pi, DIMENSION_Y, OFFSET,
         NOISE_VAR)
 X_test_input, Y_test_input, X_test_target, Y_test_target = \
-        test_data.sample_inputs_targets(NUM_TEST, TARGET_FUN)
+        test_data.sample_inputs_targets(NUM_TEST, TARGET_FUN,
+        normalise_y = [train_data.mean_y, train_data.std_y])
+#        normalise_x = [train_data.mean_x, train_data.std_x])
 
 plot_data = SequenceOneDimension(-2*np.pi, 2*np.pi, DIMENSION_Y, OFFSET,
         0)
 X_plot_input, Y_plot_input, X_plot_target, Y_plot_target = \
-        plot_data.sample_inputs_targets(NUM_PLOT, TARGET_FUN)
+        plot_data.sample_inputs_targets(1, TARGET_FUN,
+        normalise_y = [train_data.mean_y, train_data.std_y])
+#        normalise_x = [train_data.mean_x, train_data.std_x])
 
 markers = ['-', '--', '-.']
 error_fig = plt.figure()
@@ -60,8 +64,15 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
     if initialise_as_glm == 'informed':
         x_init = [X_train_input[0:1,:], X_train_target[0:1,:]]
         save_dir = 'glm_init_informed/'
-        kernel = lambda x1, x2: np.exp(-sp.distance.cdist(x1, x2, 
-            'sqeuclidean')/2).astype(np.float32)
+        kernel = lambda x1, x2: \
+                        (np.exp(-sp.distance.cdist(x1, x2, 'sqeuclidean')/2)*\
+                         np.exp(-np.sin(sp.distance.cdist(x1, x2, 'euclidean'))**2)).\
+                        astype(np.float32)
+        """
+        kernel = lambda x1, x2: \
+                        (np.exp(-sp.distance.cdist(x1, x2, 'sqeuclidean')/2)).\
+                        astype(np.float32)
+        """
     elif initialise_as_glm == 'naive':
         x_init = True
         save_dir = 'glm_init_naive/'
@@ -73,7 +84,7 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
     model = DEQGLM(f, solver=None, tol=1e-2, max_iter=25, m=5)
 
     ################################## One training or testing iteration
-    def epoch(data, model, opt=None, lr_scheduler=None):
+    def epoch(data, model, opt=None):
         total_loss = 0.
         model.eval() if opt is None else model.train()
 
@@ -84,8 +95,6 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
             opt.zero_grad()
             loss.backward()
             opt.step()
-            if not (lr_scheduler is None):
-                lr_scheduler.step()
         
         total_loss += loss.item() * list(X.shape)[0]
 
@@ -96,20 +105,19 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
     print("# Parmeters: ", sum(a.numel() for a in model.parameters()))
 
 
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, MAX_EPOCHS*NUM_TRAIN, eta_min=1e-6)
-    scheduler = None
+
     train_err = np.zeros((MAX_EPOCHS,))
     test_err = np.zeros((MAX_EPOCHS,))
     for i in range(MAX_EPOCHS):
         print(i)
-        train_err[i] = epoch([Y_train_input, Y_train_target], model, opt, scheduler)
+        train_err[i] = epoch([Y_train_input, Y_train_target], model, opt)
         test_err[i] = epoch([Y_test_input, Y_test_target], model)
     
     if PLOT:
         matplotlib_config()
 
         xlim = [-2*np.pi-OFFSET, 2*np.pi]
-        ylim = [-5, 5]
+        ylim = [-2.5, 3.5]
         plot_1d_sequence_data(X_train_input, Y_train_input, 
                 X_plot_input, Y_plot_input, save_dir + 'plot_input_train.pdf', xlim, ylim)
         plot_1d_sequence_data(X_train_target, Y_train_target, 

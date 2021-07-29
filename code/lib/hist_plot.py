@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.lines as pltlines
+
 import glob
 
 from .plotters import matplotlib_config
@@ -26,14 +28,14 @@ def plot_experiment_hist_one_row(file_dir, row, x=None, colour='b', mode='max'):
         ls = '-'
     elif mode == 'mean':
         f = np.mean
-        ls = '--'
+        ls = ':'
 
     if x is None:
         plt.plot(f(np.log(amin))*np.ones_like(data[row,:,0]), c=colour, 
-                linewidth=3, ls=ls)
+                linewidth=1, ls=ls)
     else:
         plt.plot(x, f(np.log(amin))*np.ones_like(data[row,:,0]), c=colour, 
-                linewidth=3, ls=ls)
+                linewidth=1, ls=ls)
 
 def _read_csvs(file_dir):
     all_data = None
@@ -70,15 +72,17 @@ if __name__ == '__main__':
     # Manually construct legend
     blue_patch = mpatches.Patch(color='blue', label='Informed GLM')
     red_patch = mpatches.Patch(color='red', label='Naive GLM')
-    green_patch = mpatches.Patch(color='green', label='Naive GLM')
+    green_patch = mpatches.Patch(color='green', label='Random')
 
-    linestyles = ['-.', '-', '--']
-    lines = [Line2D([0], [0], color='k', linewidth=3, linestyle=ls) \
-    for ls in linestyles]
-    labels = ['Min', 'Max', 'Mean']
+    linestyles = ['-.', ':', '-']
+    labels = ['Min', 'Mean', 'Max']
 
-    plt.legend(handles=[blue_patch, red_patch, green_patch,])
-    plt.legend(lines, labels)
+    lines = [pltlines.Line2D([0], [0], color='k', linewidth=3, 
+        linestyle=linestyles[i], label=labels[i]) \
+                for i in range(len(linestyles))]
+
+    plt.legend(handles=[blue_patch, red_patch, green_patch] + lines,
+            handlelength=4)
 
     plt.xlabel('Training epoch')
     plt.ylabel('$\log$ MSE')
