@@ -51,7 +51,8 @@ def _read_csvs(file_dir):
 
 if __name__ == '__main__':
     #DIR = 'outputs/noise_var_05/'
-    DIR = 'outputs/'
+    DIR = 'outputs/regression/'
+    #DIR = 'outputs/copymem/'
     matplotlib_config()
 
     plot_experiment_hist_one_row(DIR, row=1, colour='b', mode='all')

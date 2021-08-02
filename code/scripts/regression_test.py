@@ -20,12 +20,12 @@ NUM_TRAIN   = 20000
 NUM_TEST    = 2000
 DIMENSION_Y = 100
 NOISE_VAR   = 0.1
-MAX_EPOCHS  = 400
-PLOT        = True
+MAX_EPOCHS  = 600
+PLOT        = False
 TARGET_FUN  = lambda x: (np.exp(-0.1*np.abs(x)**2)*np.sin(x) \
         + np.exp(-(x+9)**2))
 OFFSET      = 2
-OUTPUT_DIR  = 'outputs/'
+OUTPUT_DIR  = 'outputs/regression/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
 FREEZE_FOR  = 20
 

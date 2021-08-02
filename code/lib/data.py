@@ -99,8 +99,8 @@ class CopyMemory(object):
         x_target = np.tile(x_target, [num_samples, 1])
 
         if normalise_x:
-            mean = np.mean(x_target, axis=1).reshape((-1,1))
-            std = np.std(x_target, axis=1).reshape((-1,1))
+            mean = np.mean(x_target)
+            std = np.std(x_target)
             x_input = (x_input - mean)/std
             x_target = (x_target - mean)/std
 
