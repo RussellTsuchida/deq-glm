@@ -15,9 +15,9 @@ def plot_experiment_hist_one_row(file_dir, row, x=None, colour='b', mode='max'):
         for s in range(0, data.shape[2]):
             y = data[row,:,s]
             if x is None:
-                plt.plot(np.log(y), alpha=0.3, c=colour, linewidth=1)
+                plt.plot(np.log(y), alpha=0.1, c=colour, linewidth=1)
             else:
-                plt.plot(x, np.log(y), alpha=0.3, c=colour, linewidth=1)
+                plt.plot(x, np.log(y), alpha=0.1, c=colour, linewidth=1)
         plt.savefig('outputs/all_plots.pdf', bbox_inches='tight')
         return
     elif mode == 'min':
@@ -55,6 +55,8 @@ if __name__ == '__main__':
     #DIR = 'outputs/copymem/'
     matplotlib_config()
 
+    plt.figure(figsize=(10,7))
+
     plot_experiment_hist_one_row(DIR, row=1, colour='b', mode='all')
     plot_experiment_hist_one_row(DIR, row=3, colour='r', mode='all')
     plot_experiment_hist_one_row(DIR, row=5, colour='g', mode='all')
@@ -84,10 +86,10 @@ if __name__ == '__main__':
                 for i in range(len(linestyles))]
 
     plt.legend(handles=[blue_patch, red_patch, green_patch] + lines,
-            handlelength=4)
+            handlelength=4, fontsize=30)
 
     plt.xlabel('Training epoch')
     plt.ylabel('$\log$ MSE')
     plt.tight_layout()
-    plt.savefig('outputs/all_plots.pdf')
+    plt.savefig('outputs/all_plots.pdf', bbox_inches='tight')
 
