@@ -20,15 +20,17 @@ NUM_TRAIN   = 20000
 NUM_TEST    = 2000
 DIMENSION_Y = 100
 NOISE_VAR   = 0.1
-MAX_EPOCHS  = 100
-PLOT        = True
+MAX_EPOCHS  = 600
+PLOT        = False
 TARGET_FUN  = lambda x: (np.exp(-0.1*np.abs(x)**2)*np.sin(x) \
         + np.exp(-(x+9)**2))
 OFFSET      = 2
-OUTPUT_DIR  = 'outputs/'
+OUTPUT_DIR  = 'outputs/regression/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
+FREEZE_FOR  = 20
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+matplotlib_config()
 torch.manual_seed(SEED)
 np.random.seed(SEED)
 
@@ -104,35 +106,49 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
     opt = optim.Adam(model.parameters(), lr=1e-3)
     print("# Parmeters: ", sum(a.numel() for a in model.parameters()))
 
-
-
     train_err = np.zeros((MAX_EPOCHS,))
     test_err = np.zeros((MAX_EPOCHS,))
     for i in range(MAX_EPOCHS):
         print(i)
+        if (initialise_as_glm == 'naive') and (i < FREEZE_FOR):
+            for param in model.deq.f.linear1.parameters():
+                param.requires_grad = False
+            for param in model.deq.f.linear2.parameters():
+                param.requires_grad = False
+        else:
+            for param in model.deq.f.linear1.parameters():
+                param.requires_grad = True
+            for param in model.deq.f.linear2.parameters():
+                param.requires_grad = True
+
         train_err[i] = epoch([Y_train_input, Y_train_target], model, opt)
         test_err[i] = epoch([Y_test_input, Y_test_target], model)
-    
+        
+        # Plot some sample trajcetories
+        if PLOT and i in [0, FREEZE_FOR, MAX_EPOCHS-1]:
+            xlim = [-2*np.pi-OFFSET, 2*np.pi]
+            ylim = [-2.5, 2.5]
+            plot_1d_sequence_data(X_train_input, Y_train_input, 
+                    X_plot_input, Y_plot_input, 
+                    save_dir + str(i) + 'plot_input_train.pdf', xlim, ylim)
+            plot_1d_sequence_data(X_train_target, Y_train_target, 
+                    X_plot_target, Y_plot_target, 
+                    save_dir + str(i) + 'plot_target_train.pdf', xlim, ylim)
+            pred = model(Y_train_input).detach().numpy()
+            plot_1d_sequence_data(X_train_target, pred, 
+                    X_plot_target, Y_plot_target, 
+                    save_dir + str(i) + 'plot_target_train_pred.pdf', xlim, ylim)
+            plot_1d_sequence_data(X_test_input, Y_test_input, 
+                    X_plot_input, Y_plot_input, 
+                    save_dir + str(i) + 'plot_input_test.pdf', xlim, ylim)
+            plot_1d_sequence_data(X_test_target, Y_test_target, 
+                    X_plot_target, Y_plot_target, 
+                    save_dir + str(i) + 'plot_target_test.pdf', xlim, ylim)
+            pred = model(Y_test_input).detach().numpy()
+            plot_1d_sequence_data(X_test_target, pred, 
+                    X_plot_target, Y_plot_target, 
+                    save_dir + str(i) + 'plot_target_test_pred.pdf', xlim, ylim)
     if PLOT:
-        matplotlib_config()
-
-        xlim = [-2*np.pi-OFFSET, 2*np.pi]
-        ylim = [-2.5, 3.5]
-        plot_1d_sequence_data(X_train_input, Y_train_input, 
-                X_plot_input, Y_plot_input, save_dir + 'plot_input_train.pdf', xlim, ylim)
-        plot_1d_sequence_data(X_train_target, Y_train_target, 
-                X_plot_target, Y_plot_target, save_dir + 'plot_target_train.pdf', xlim, ylim)
-        pred = model(Y_train_input).detach().numpy()
-        plot_1d_sequence_data(X_train_target, pred, 
-                X_plot_target, Y_plot_target, save_dir + 'plot_target_train_pred.pdf', xlim, ylim)
-        plot_1d_sequence_data(X_test_input, Y_test_input, 
-                X_plot_input, Y_plot_input, save_dir + 'plot_input_test.pdf', xlim, ylim)
-        plot_1d_sequence_data(X_test_target, Y_test_target, 
-                X_plot_target, Y_plot_target, save_dir + 'plot_target_test.pdf', xlim, ylim)
-        pred = model(Y_test_input).detach().numpy()
-        plot_1d_sequence_data(X_test_target, pred, 
-                X_plot_target, Y_plot_target, save_dir + 'plot_target_test_pred.pdf', xlim, ylim)
-
         # Plot error curves
         plt.figure(error_fig.number)
         plt.plot(np.log(train_err), c='b', label='training', ls=markers[m_idx])

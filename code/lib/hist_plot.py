@@ -15,10 +15,10 @@ def plot_experiment_hist_one_row(file_dir, row, x=None, colour='b', mode='max'):
         for s in range(0, data.shape[2]):
             y = data[row,:,s]
             if x is None:
-                plt.plot(np.log(y), alpha=0.3, c=colour, linewidth=1)
+                plt.plot(np.log(y), alpha=0.1, c=colour, linewidth=1)
             else:
-                plt.plot(x, np.log(y), alpha=0.3, c=colour, linewidth=1)
-        plt.savefig('outputs/all_plots.pdf')
+                plt.plot(x, np.log(y), alpha=0.1, c=colour, linewidth=1)
+        plt.savefig('outputs/all_plots.pdf', bbox_inches='tight')
         return
     elif mode == 'min':
         f = np.amin
@@ -29,13 +29,14 @@ def plot_experiment_hist_one_row(file_dir, row, x=None, colour='b', mode='max'):
     elif mode == 'mean':
         f = np.mean
         ls = ':'
-
+    
+    length = data.shape[1]
     if x is None:
-        plt.plot(f(np.log(amin))*np.ones_like(data[row,:,0]), c=colour, 
-                linewidth=1, ls=ls)
+        plt.plot(f(np.log(amin))*np.ones_like(data[row,:,0])[:int(length/10)], 
+                c=colour, linewidth=1, ls=ls)
     else:
-        plt.plot(x, f(np.log(amin))*np.ones_like(data[row,:,0]), c=colour, 
-                linewidth=1, ls=ls)
+        plt.plot(x[0:10], f(np.log(amin))*np.ones_like(data[row,:,0])[:int(length/10)], 
+                c=colour, linewidth=1, ls=ls)
 
 def _read_csvs(file_dir):
     all_data = None
@@ -50,8 +51,11 @@ def _read_csvs(file_dir):
 
 if __name__ == '__main__':
     #DIR = 'outputs/noise_var_05/'
-    DIR = 'outputs/'
+    DIR = 'outputs/regression/'
+    #DIR = 'outputs/copymem/'
     matplotlib_config()
+
+    plt.figure(figsize=(10,7))
 
     plot_experiment_hist_one_row(DIR, row=1, colour='b', mode='all')
     plot_experiment_hist_one_row(DIR, row=3, colour='r', mode='all')
@@ -70,8 +74,8 @@ if __name__ == '__main__':
     plot_experiment_hist_one_row(DIR, row=5, colour='g', mode='mean')
     
     # Manually construct legend
-    blue_patch = mpatches.Patch(color='blue', label='Informed GLM')
-    red_patch = mpatches.Patch(color='red', label='Naive GLM')
+    blue_patch = mpatches.Patch(color='blue', label='Informed')
+    red_patch = mpatches.Patch(color='red', label='Naive')
     green_patch = mpatches.Patch(color='green', label='Random')
 
     linestyles = ['-.', ':', '-']
@@ -82,10 +86,10 @@ if __name__ == '__main__':
                 for i in range(len(linestyles))]
 
     plt.legend(handles=[blue_patch, red_patch, green_patch] + lines,
-            handlelength=4)
+            handlelength=4, fontsize=30)
 
     plt.xlabel('Training epoch')
     plt.ylabel('$\log$ MSE')
     plt.tight_layout()
-    plt.savefig('outputs/all_plots.pdf')
+    plt.savefig('outputs/all_plots.pdf', bbox_inches='tight')
 

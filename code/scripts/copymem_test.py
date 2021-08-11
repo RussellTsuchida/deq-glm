@@ -18,11 +18,11 @@ import sys
 NUM_TRAIN   = 20000
 NUM_TEST    = 2000
 MEM_LENGTH  = 400
-NUM_PLOT    = 100
-MAX_EPOCHS  = 4000
-PLOT        = False
-OUTPUT_DIR  = 'outputs/'
+MAX_EPOCHS  = 5000
+PLOT        = True
+OUTPUT_DIR  = 'outputs/copymem/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
+FREEZE_FOR  = 20
 
 #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #print(device)
@@ -40,7 +40,7 @@ X_test_input, Y_test_input, X_test_target, Y_test_target = \
 
 plot_data = CopyMemory(MEM_LENGTH)
 X_plot_input, Y_plot_input, X_plot_target, Y_plot_target = \
-        plot_data.sample_inputs_targets(NUM_PLOT,normalise_x=True)
+        plot_data.sample_inputs_targets(1,normalise_x=True)
 
 markers = ['-', '--', '-.']
 activations = [torch.nn.Sigmoid(), torch.nn.Sigmoid(), torch.nn.Sigmoid()]
@@ -56,7 +56,7 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
         save_dir = 'glm_init_informed/'
         cos_ker = lambda x1, x2: x1 @ x2.T / \
                 (np.linalg.norm(x1, axis=1)*np.linalg.norm(x2.T, axis=0))
-        kernel = lambda x1, x2: ( np.abs(cos_ker(x1, x2) - 1) <= 1e-4).astype(np.float32)
+        kernel = lambda x1, x2: ( np.abs(cos_ker(x1, x2) - 1) <= 1e-3).astype(np.float32)
     elif initialise_as_glm == 'naive':
         x_init = True
         save_dir = 'glm_init_naive/'
@@ -95,27 +95,23 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
     test_err = np.zeros((MAX_EPOCHS,))
     for i in range(MAX_EPOCHS):
         print(i, flush=True)
+        if (initialise_as_glm == 'naive') and (i < FREEZE_FOR):
+            for param in model.deq.f.linear1.parameters():
+                param.requires_grad = False
+            for param in model.deq.f.linear2.parameters():
+                param.requires_grad = False
+        else:
+            for param in model.deq.f.linear1.parameters():
+                param.requires_grad = True
+            for param in model.deq.f.linear2.parameters():
+                param.requires_grad = True
+
         train_err[i] = epoch([Y_train_input, Y_train_target], model, opt)
         test_err[i] = epoch([Y_test_input, Y_test_target], model)
     
     if PLOT:
         matplotlib_config()
-
-        plot_1d_sequence_data(X_train_input, Y_train_input, 
-                X_plot_input, Y_plot_input, save_dir + 'plot_input_train.pdf')
-        plot_1d_sequence_data(X_train_target, Y_train_target, 
-                X_plot_target, Y_plot_target, save_dir + 'plot_target_train.pdf')
-        pred = model(Y_train_input).detach().numpy()
-        plot_1d_sequence_data(X_train_target, pred, 
-                X_plot_target, Y_plot_target, save_dir + 'plot_target_train_pred.pdf')
-        plot_1d_sequence_data(X_test_input, Y_test_input, 
-                X_plot_input, Y_plot_input, save_dir + 'plot_input_test.pdf')
-        plot_1d_sequence_data(X_test_target, Y_test_target, 
-                X_plot_target, Y_plot_target, save_dir + 'plot_target_test.pdf')
-        pred = model(Y_test_input).detach().numpy()
-        plot_1d_sequence_data(X_test_target, pred, 
-                X_plot_target, Y_plot_target, save_dir + 'plot_target_test_pred.pdf')
-
+	
         # Plot error curves
         plt.figure(error_fig.number)
         plt.plot(np.log(train_err), c='b', label='training', ls=markers[m_idx])
