@@ -55,13 +55,19 @@ ax[1].annotate('$Y_i$', xy=(0.5, -0.05), xytext=(0.5, -0.2),
 
 rect = patches.Rectangle((0,f1_1d), w*h,10, linewidth=1, edgecolor='r', facecolor='none')
 ax[0].add_patch(rect)
+ax[0].annotate(r'$\tilde{C}_{' + str(f1_1d) + '}$', xy=(0.5, 0.8), xytext=(0.5, 0.8),
+            fontsize=14, ha='center', va='bottom', xycoords='axes fraction',
+            color='red')
 
 rect = patches.Rectangle((0,f2_1d), w*h,10, linewidth=1, edgecolor='y', facecolor='none')
 ax[0].add_patch(rect)
+ax[0].annotate(r'$\tilde{C}_{' + str(f2_1d) + '}$', xy=(0.5, 0.3), xytext=(0.5, 0.3),
+            fontsize=14, ha='center', va='bottom', xycoords='axes fraction',
+            color='yellow')
 
 ax[0].imshow(K, aspect=1)
 ax[0].axis('off')
-ax[0].annotate('$K(X_i,X_i)$', xy=(0.5, -0.05), xytext=(0.5, -0.2),
+ax[0].annotate('$W_1 = -\lambda^{-1}k(X_i,X_i)$', xy=(0.5, -0.05), xytext=(0.5, -0.2),
             fontsize=14, ha='center', va='bottom', xycoords='axes fraction',
             arrowprops=dict(arrowstyle='-[, widthB=8.0', lw=2.0))
 
@@ -97,10 +103,10 @@ ax[0].annotate('$W$', xy=(0.5, -0.05), xytext=(0.5, -0.2),
             fontsize=14, ha='center', va='bottom', xycoords='axes fraction',
             arrowprops=dict(arrowstyle='-[, widthB=7.0', lw=2.0))
 """
-ax[0].annotate('$W$', xy=(0.5, 0.5), xytext=(0.35, 0.65), 
+ax[0].annotate('$C_{'+str(f1_1d)+'}$', xy=(0.5, 0.5), xytext=(0.35, 0.65), 
             fontsize=14, ha='center', va='bottom', xycoords='axes fraction',
             color='red')
-ax[0].annotate('$W$', xy=(0.5, 0.5), xytext=(0.65, 0.18), 
+ax[0].annotate('$C_{'+str(f2_1d)+'}$', xy=(0.5, 0.5), xytext=(0.65, 0.18), 
             fontsize=14, ha='center', va='bottom', xycoords='axes fraction',
             color='yellow')
 

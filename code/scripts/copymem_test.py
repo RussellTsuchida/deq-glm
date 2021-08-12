@@ -15,10 +15,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
-NUM_TRAIN   = 20000
-NUM_TEST    = 2000
-MEM_LENGTH  = 400
-MAX_EPOCHS  = 5000
+NUM_TRAIN   = 200
+NUM_TEST    = 20
+MEM_LENGTH  = 50
+MAX_EPOCHS  = 100
 PLOT        = True
 OUTPUT_DIR  = 'outputs/copymem/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
@@ -42,8 +42,10 @@ plot_data = CopyMemory(MEM_LENGTH)
 X_plot_input, Y_plot_input, X_plot_target, Y_plot_target = \
         plot_data.sample_inputs_targets(1,normalise_x=True)
 
+
 markers = ['-', '--', '-.']
 activations = [torch.nn.Sigmoid(), torch.nn.Sigmoid(), torch.nn.Sigmoid()]
+#activations = [None, None, None]
 error_fig = plt.figure()
 # train/test error curves for standard and our init
 experiment_data = np.zeros((6, MAX_EPOCHS)) 
@@ -64,7 +66,7 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
         x_init = False
         save_dir = 'not_glm_init/'
 
-    f = FullyConnectedLayer(MEM_LENGTH+20, MEM_LENGTH+20, MEM_LENGTH+20, 
+    f = FullyConnectedLayer(MEM_LENGTH+20, MEM_LENGTH+20, (MEM_LENGTH+20)*10, 
             x_init = x_init, kernel = kernel, activation=activations[m_idx])
 
     model = DEQGLM(f, solver=None, tol=1e-2, max_iter=25, m=5)
@@ -76,8 +78,7 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
 
         X, y = data
         yp = model(X)
-        loss = nn.MSELoss()(yp,y)
-        #loss = nn.L1Loss()(yp,y)
+        loss = nn.CrossEntropyLoss()(yp,y)
         if opt:
             opt.zero_grad()
             loss.backward()
@@ -105,9 +106,33 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
                 param.requires_grad = True
             for param in model.deq.f.linear2.parameters():
                 param.requires_grad = True
-
+        
         train_err[i] = epoch([Y_train_input, Y_train_target], model, opt)
         test_err[i] = epoch([Y_test_input, Y_test_target], model)
+
+	# Plot some sample trajcetories
+        if PLOT and i in [0, FREEZE_FOR, MAX_EPOCHS-1]:
+            xlim=[1.5, 2]
+            plot_1d_sequence_data(X_train_input, Y_train_input, 
+                    X_plot_input, Y_plot_input, 
+                    save_dir + str(i) + 'plot_input_train.pdf', xlim=xlim)
+            plot_1d_sequence_data(X_train_target, Y_train_target, 
+                    X_plot_target, Y_plot_target, 
+                    save_dir + str(i) + 'plot_target_train.pdf', xlim=xlim)
+            pred = model(Y_train_input).detach().numpy()
+            plot_1d_sequence_data(X_train_target, pred, 
+                    X_plot_target, Y_plot_target, 
+                    save_dir + str(i) + 'plot_target_train_pred.pdf', xlim=xlim)
+            plot_1d_sequence_data(X_test_input, Y_test_input, 
+                    X_plot_input, Y_plot_input, 
+                    save_dir + str(i) + 'plot_input_test.pdf', xlim=xlim)
+            plot_1d_sequence_data(X_test_target, Y_test_target, 
+                    X_plot_target, Y_plot_target, 
+                    save_dir + str(i) + 'plot_target_test.pdf', xlim=xlim)
+            pred = model(Y_test_input).detach().numpy()
+            plot_1d_sequence_data(X_test_target, pred, 
+                    X_plot_target, Y_plot_target, 
+                    save_dir + str(i) + 'plot_target_test_pred.pdf', xlim=xlim)
     
     if PLOT:
         matplotlib_config()
