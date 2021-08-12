@@ -93,6 +93,9 @@ class CopyMemory(object):
         y_target = np.zeros((num_samples, self.T+20))
         y_target[:, self.T+10:] = y_input[:,0:10]
 
+        y_input = self._as_one_hot(y_input)
+        y_target = self._as_one_hot(y_target)
+
         x_input = np.arange(0, self.T+20, 1).reshape((1, -1))
         x_input = np.tile(x_input, [num_samples, 1])
         x_target = np.arange(-self.T-10, 10, 1).reshape((1, -1))
@@ -111,6 +114,10 @@ class CopyMemory(object):
 
         return [f(x_input), f(y_input), f(x_target), f(y_target)]
 
-
+    def _as_one_hot(self, x, num_classes=10):
+        ret = np.eye(num_classes)[x.astype(np.int)]
+        ret = np.swapaxes(ret, 1, 2)
+        ret = np.swapaxes(ret, 0, 2)
+        return ret
         
 
