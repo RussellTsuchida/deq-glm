@@ -6,6 +6,21 @@ import numpy as np
 import copy
 import scipy.spatial as sp
 
+class ConvNet(nn.Module):
+    def __init__(self, n_channels, n_inner_channels, kernel_size=3):
+        super().__init__()
+        self.conv1 = nn.Conv2d(n_channels, n_inner_channels, kernel_size, 
+                padding=kernel_size//2, bias=False)
+        self.conv2 = nn.Conv2d(n_inner_channels, n_channels, kernel_size, 
+                padding=kernel_size//2, bias=False)
+        self.conv2.weight.data.normal_(0, 0.01)
+        self.conv1.weight.data.normal_(0, 0.01)
+        
+    def forward(self, z, x):
+        y = F.relu(self.conv1(z))
+        return F.relu(z + self.conv2(y))
+
+
 class ResNetLayer(nn.Module):
     def __init__(self, n_channels, n_inner_channels, kernel_size=3, 
             num_groups=8):
@@ -165,8 +180,8 @@ class DEQFixedPoint(nn.Module):
 
     def _init_solver(self, solver):
         if solver is None:
-            solver = self.anderson
-            #solver = self.forward_iteration
+            #solver = self.anderson
+            solver = self.forward_iteration
         self.solver = solver
 
     def forward(self, x):
