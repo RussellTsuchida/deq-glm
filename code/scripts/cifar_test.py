@@ -1,5 +1,5 @@
 # Internals
-from ..lib.deq import (ResNetLayer, DEQFixedPoint)
+from ..lib.deq import (ResNetLayer, DEQFixedPoint, ConvNet)
 
 # Torch
 import torch
@@ -12,8 +12,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(0)
 
 ################################## Initialise the Model
-chan = 8
-f = ResNetLayer(chan, 8, kernel_size=3)
+chan = 48
+f = ConvNet(chan, 48, kernel_size=3)
 model = nn.Sequential(nn.Conv2d(3,chan, kernel_size=3, bias=True, padding=1),
                       nn.BatchNorm2d(chan),
                       DEQFixedPoint(f, solver=None, tol=1e-2, max_iter=25, m=5),
