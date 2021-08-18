@@ -41,7 +41,7 @@ class ResNetLayer(nn.Module):
 
 class FullyConnectedLayer(nn.Module):
     def __init__(self, num_in, width, num_out, activation=None, x_init=False, 
-            kernel=None):
+            kernel=None, T = 5):
         """
         x_init (Bool or list(Torch Tensor)): If False, use random 
             initialisation. If True, use naive initialisation. If a list
@@ -51,6 +51,8 @@ class FullyConnectedLayer(nn.Module):
         self.num_in = num_in
         self.num_out = num_out
         self.width  = width
+
+        self.T = T
         self._init_kernel(kernel)
         self._init_activation(activation)
         self._init_layers(x_init)
@@ -80,8 +82,6 @@ class FullyConnectedLayer(nn.Module):
             if (x_init == True):
                 x_in = torch.from_numpy(\
                         np.linspace(-2*np.pi, 2*np.pi, self.num_in).reshape((1,-1)))
-                #x_out = torch.from_numpy(\
-                #        np.linspace(-2*np.pi, 2*np.pi, self.num_out).reshape((1,-1)))
                 x_out = None
                 x_init = [x_in, x_out]
             self._informed_init(x_init)
@@ -89,26 +89,26 @@ class FullyConnectedLayer(nn.Module):
     def _informed_init(self, x_init):
         x = x_init[0]; x_star = x_init[1]
 
-        T = 5
-        K = self.kernel(x.numpy().T, x.numpy().T)/T
-        lamb = (np.linalg.norm(K)/5)
-        evals = np.linalg.eigvals(K/(T*lamb))
+        K = self.kernel(x.numpy().T, x.numpy().T)/self.T
+        lamb = (np.linalg.norm(K)/self.T)
+        evals = np.linalg.eigvals(K/(self.T*lamb))
 
-        print(np.linalg.det(K/(T*lamb)))
-        print(np.linalg.norm(K/(lamb*T)))
+        print(np.linalg.det(K/(self.T*lamb)))
+        print(np.linalg.norm(K/(lamb*self.T)))
         print(lamb)
 
         x0 = torch.zeros_like(x)
-        neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb*T))
-        K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb*T))
+        neg_K_norm = lambda K_in:
+            torch.from_numpy(-copy.deepcopy(K_in)/(lamb*self.T))
+        K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb*self.T))
         
         self.linear1.weight = nn.parameter.Parameter(neg_K_norm(K))
         self.linear2.weight = nn.parameter.Parameter(K_norm(K))
         
         if not (x_star is None):
-            K_star = self.kernel(x_star.numpy().T, x.numpy().T)/T
-            self.linear3.weight = nn.parameter.Parameter(neg_K_norm(T*K_star))
-            self.linear4.weight = nn.parameter.Parameter(K_norm(T*K_star))
+            K_star = self.kernel(x_star.numpy().T, x.numpy().T)/self.T
+            self.linear3.weight = nn.parameter.Parameter(neg_K_norm(self.T*K_star))
+            self.linear4.weight = nn.parameter.Parameter(K_norm(self.T*K_star))
         self.linear4.weight.requires_grad = True
 
     def _init_activation(self, activation):
@@ -179,9 +179,10 @@ class DEQFixedPoint(nn.Module):
         return f0, res
 
     def _init_solver(self, solver):
-        if solver is None:
-            #solver = self.anderson
+        if (solver is None) or (solver == 'naive'):
             solver = self.forward_iteration
+        elif solver == 'anderson':
+            solver = self.anderson
         self.solver = solver
 
     def forward(self, x):
