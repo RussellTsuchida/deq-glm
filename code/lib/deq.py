@@ -23,7 +23,7 @@ class ConvNet(nn.Module):
 
 class ResNetLayer(nn.Module):
     def __init__(self, n_channels, n_inner_channels, kernel_size=3, 
-            num_groups=8):
+            num_groups=8, init_as = 'random'):
         super().__init__()
         self.conv1 = nn.Conv2d(n_channels, n_inner_channels, kernel_size, 
                 padding=kernel_size//2, bias=False)
@@ -32,8 +32,35 @@ class ResNetLayer(nn.Module):
         self.norm1 = nn.GroupNorm(num_groups, n_inner_channels)
         self.norm2 = nn.GroupNorm(num_groups, n_channels)
         self.norm3 = nn.GroupNorm(num_groups, n_channels)
-        self.conv1.weight.data.normal_(0, 0.01)
-        self.conv2.weight.data.normal_(0, 0.01)
+
+        self._init_kernel(None)
+        self._init_params(init_as)
+
+    def _init_kernel(self, kernel):
+        if kernel is None:
+            kernel = lambda x1, x2: (np.exp(-\
+                    sp.distance.cdist(x1, x2, 'sqeuclidean')/2)).\
+                    astype(np.float32)
+        self.kernel = kernel
+
+    def _init_params(self, init_as):
+        if init_as == 'random':
+            self.conv1.weight.data.normal_(0, 0.01)
+            self.conv2.weight.data.normal_(0, 0.01)
+        elif init_as == 'informed':
+            kernel_size = self.conv1.weight.shape[2]
+            assert kernel_size == self.conv1.weight.shape[3]
+            assert (kernel_size % 2)
+
+            x = np.arange(0, kernel_size, 1).astype(np.int)
+            X = np.transpose([np.tile(x, len(x)), np.repeat(x, len(x))])
+            mid = (kernel_size + 1)/2-1
+            mid = np.asarray([[mid, mid]])
+            k = self.kernel(mid, X).reshape((kernel_size, kernel_size))
+            k = np.tile(k, [self.conv1.weight.shape[0],
+                            self.conv1.weight.shape[1], 1, 1])
+
+            self.conv1.weight = nn.parameter.Parameter(torch.from_numpy(k))
         
     def forward(self, z, x):
         y = self.norm1(F.relu(self.conv1(z)))
@@ -98,8 +125,7 @@ class FullyConnectedLayer(nn.Module):
         print(lamb)
 
         x0 = torch.zeros_like(x)
-        neg_K_norm = lambda K_in:
-            torch.from_numpy(-copy.deepcopy(K_in)/(lamb*self.T))
+        neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb*self.T))
         K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb*self.T))
         
         self.linear1.weight = nn.parameter.Parameter(neg_K_norm(K))

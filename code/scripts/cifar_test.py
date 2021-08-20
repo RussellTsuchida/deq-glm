@@ -8,19 +8,18 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-torch.manual_seed(0)
+# Other
+import numpy as np
+import sys
 
-################################## Initialise the Model
-chan = 48
-f = ConvNet(chan, 48, kernel_size=3)
-model = nn.Sequential(nn.Conv2d(3,chan, kernel_size=3, bias=True, padding=1),
-                      nn.BatchNorm2d(chan),
-                      DEQFixedPoint(f, solver=None, tol=1e-2, max_iter=25, m=5),
-                      nn.BatchNorm2d(chan),
-                      nn.AvgPool2d(8,8),
-                      nn.Flatten(),
-                      nn.Linear(chan*4*4,10)).to(device)
+MAX_EPOCHS  = 50
+CHANNELS_1  = 48
+CHANNELS_2  = 64
+OUTPUT_DIR  = 'outputs/cifar10/'
+SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+torch.manual_seed(SEED)
 
 ################################## Load CIFAR10
 cifar10_train = datasets.CIFAR10(".", train=True, download=True, transform=transforms.ToTensor())
@@ -47,13 +46,39 @@ def epoch(loader, model, opt=None, lr_scheduler=None):
 
     return total_err / len(loader.dataset), total_loss / len(loader.dataset)
 
-################################## Optimise, minimising the cross entropy loss
-opt = optim.Adam(model.parameters(), lr=1e-3)
-print("# Parmeters: ", sum(a.numel() for a in model.parameters()))
+experiment_data = np.zeros((6, MAX_EPOCHS))
+#init_types = ['informed', 'naive', 'random']
+init_types = ['random']
 
-max_epochs = 50
-scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, max_epochs*len(train_loader), eta_min=1e-6)
+for m_idx, initialise_as_glm in enumerate(init_types):
+    ################################## Initialise the Model
+    #f = ConvNet(CHANNELS_1, 64, kernel_size=3)
+    f = ResNetLayer(CHANNELS_1, CHANNELS_2, kernel_size=3, init_as='informed')
+    model = nn.Sequential(nn.Conv2d(3,CHANNELS_1, kernel_size=3, bias=True, padding=1),
+                          nn.BatchNorm2d(CHANNELS_1),
+                          DEQFixedPoint(f, solver=None, tol=1e-2, max_iter=25, m=5),
+                          nn.BatchNorm2d(CHANNELS_1),
+                          nn.AvgPool2d(8,8),
+                          nn.Flatten(),
+                          nn.Linear(CHANNELS_1*4*4,10)).to(device)
 
-for i in range(50):
-    print(epoch(train_loader, model, opt, scheduler))
-    print(epoch(test_loader, model))
+
+    ################################## Optimise, minimising the cross entropy loss
+    opt = optim.Adam(model.parameters(), lr=1e-3)
+    print("# Parmeters: ", sum(a.numel() for a in model.parameters()))
+
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, MAX_EPOCHS*len(train_loader), eta_min=1e-6)
+    
+    train_acc = np.zeros((MAX_EPOCHS,))
+    test_acc = np.zeros((MAX_EPOCHS,))
+    for i in range(MAX_EPOCHS):
+        train_acc[i] = epoch(train_loader, model, opt, scheduler)[0]
+        test_acc[i] = epoch(test_loader, model)[0]
+        print(train_acc[i])
+        print(test_acc[i])
+
+    experiment_data[2*m_idx,:] = train_acc
+    experiment_data[2*m_idx+1,:] = test_acc
+        
+np.savetxt(OUTPUT_DIR + str(SEED).zfill(4) + '.csv', experiment_data)
+
