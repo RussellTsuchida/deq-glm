@@ -53,7 +53,7 @@ init_types = ['random']
 for m_idx, initialise_as_glm in enumerate(init_types):
     ################################## Initialise the Model
     #f = ConvNet(CHANNELS_1, 64, kernel_size=3)
-    f = ResNetLayer(CHANNELS_1, CHANNELS_2, kernel_size=3, init_as='informed')
+    f = ResNetLayer(CHANNELS_1, CHANNELS_2, kernel_size=3, init_as=initialise_as_glm)
     model = nn.Sequential(nn.Conv2d(3,CHANNELS_1, kernel_size=3, bias=True, padding=1),
                           nn.BatchNorm2d(CHANNELS_1),
                           DEQFixedPoint(f, solver=None, tol=1e-2, max_iter=25, m=5),
