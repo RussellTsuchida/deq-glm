@@ -20,14 +20,14 @@ NUM_TRAIN   = 20000
 NUM_TEST    = 2000
 DIMENSION_Y = 100
 NOISE_VAR   = 0.1
-MAX_EPOCHS  = 600
+MAX_EPOCHS  = 800
 PLOT        = False
 TARGET_FUN  = lambda x: (np.exp(-0.1*np.abs(x)**2)*np.sin(x) \
         + np.exp(-(x+9)**2))
 OFFSET      = 2
-OUTPUT_DIR  = 'outputs/regression/'
+OUTPUT_DIR  = 'outputs/smooth/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
-FREEZE_FOR  = 20
+FREEZE_FOR  = 0
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 matplotlib_config()
@@ -70,11 +70,7 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
                         (np.exp(-sp.distance.cdist(x1, x2, 'sqeuclidean')/2)*\
                          np.exp(-np.sin(sp.distance.cdist(x1, x2, 'euclidean'))**2)).\
                         astype(np.float32)
-        """
-        kernel = lambda x1, x2: \
-                        (np.exp(-sp.distance.cdist(x1, x2, 'sqeuclidean')/2)).\
-                        astype(np.float32)
-        """
+
     elif initialise_as_glm == 'naive':
         x_init = True
         save_dir = 'glm_init_naive/'
@@ -83,7 +79,7 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
         save_dir = 'not_glm_init/'
     f = FullyConnectedLayer(DIMENSION_Y, DIMENSION_Y, DIMENSION_Y, 
             x_init = x_init, kernel=kernel)
-    model = DEQGLM(f, solver=None, tol=1e-2, max_iter=25, m=5)
+    model = DEQGLM(f, solver=None, tol=1e-2, max_iter=25, m=5).to(device)
 
     ################################## One training or testing iteration
     def epoch(data, model, opt=None):
@@ -91,6 +87,7 @@ for m_idx, initialise_as_glm in enumerate(['informed', 'naive', 'random']):
         model.eval() if opt is None else model.train()
 
         X, y = data
+        X,y = X.to(device), y.to(device)
         yp = model(X)
         loss = nn.MSELoss()(yp,y)
         if opt:

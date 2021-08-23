@@ -68,7 +68,7 @@ class ResNetLayer(nn.Module):
 
 class FullyConnectedLayer(nn.Module):
     def __init__(self, num_in, width, num_out, activation=None, x_init=False, 
-            kernel=None, T = 5):
+            kernel=None):
         """
         x_init (Bool or list(Torch Tensor)): If False, use random 
             initialisation. If True, use naive initialisation. If a list
@@ -79,7 +79,6 @@ class FullyConnectedLayer(nn.Module):
         self.num_out = num_out
         self.width  = width
 
-        self.T = T
         self._init_kernel(kernel)
         self._init_activation(activation)
         self._init_layers(x_init)
@@ -116,35 +115,24 @@ class FullyConnectedLayer(nn.Module):
     def _informed_init(self, x_init):
         x = x_init[0]; x_star = x_init[1]
 
-        K = self.kernel(x.numpy().T, x.numpy().T)/self.T
-        lamb = (np.linalg.norm(K)/self.T)
-        evals = np.linalg.eigvals(K/(self.T*lamb))
+        K = self.kernel(x.numpy().T, x.numpy().T)
+        lamb = (np.linalg.norm(K, ord=2))
 
-        print(np.linalg.det(K/(self.T*lamb)))
-        print(np.linalg.norm(K/(lamb*self.T)))
-        print(lamb)
-
-        x0 = torch.zeros_like(x)
-        neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb*self.T))
-        K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb*self.T))
+        neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb))
+        K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb))
         
         self.linear1.weight = nn.parameter.Parameter(neg_K_norm(K))
         self.linear2.weight = nn.parameter.Parameter(K_norm(K))
         
         if not (x_star is None):
-            K_star = self.kernel(x_star.numpy().T, x.numpy().T)/self.T
-            self.linear3.weight = nn.parameter.Parameter(neg_K_norm(self.T*K_star))
-            self.linear4.weight = nn.parameter.Parameter(K_norm(self.T*K_star))
+            K_star = self.kernel(x_star.numpy().T, x.numpy().T)
+            self.linear3.weight = nn.parameter.Parameter(neg_K_norm(K_star))
+            self.linear4.weight = nn.parameter.Parameter(K_norm(K_star))
         self.linear4.weight.requires_grad = True
 
     def _init_activation(self, activation):
         if activation is None:
             activation = lambda z: torch.nn.Tanh()(z)
-            #activation = torch.nn.Identity()
-            #activation = lambda z: torch.exp(z)
-            #activation = torch.nn.Sigmoid()
-            #activation = torch.erf
-            #activation = torch.nn.ReLU()
         self.activation = activation
         
     def forward(self, z, x):

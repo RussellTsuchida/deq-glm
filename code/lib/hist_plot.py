@@ -51,7 +51,7 @@ def _read_csvs(file_dir):
 
 if __name__ == '__main__':
     #DIR = 'outputs/noise_var_05/'
-    DIR = 'outputs/regression/'
+    DIR = 'outputs/smooth/'
     #DIR = 'outputs/copymem/'
     matplotlib_config()
 
@@ -91,5 +91,5 @@ if __name__ == '__main__':
     plt.xlabel('Training epoch')
     plt.ylabel('$\log$ MSE')
     plt.tight_layout()
-    plt.savefig('outputs/all_plots.pdf', bbox_inches='tight')
+    plt.savefig(DIR + 'all_plots.pdf', bbox_inches='tight')
 
