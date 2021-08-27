@@ -92,8 +92,7 @@ def epoch(loader, model, opt=None, lr_scheduler=None, plot=False):
     return total_loss / len(loader.dataset)
 
 experiment_data = np.zeros((6, MAX_EPOCHS+2, 7))
-#init_types = ['informed', 'random']
-init_types = ['random']
+init_types = ['informed', 'random']
 init_scale_random = [10e-5, 10e-4, 10e-3, 10e-2, 10e-1, 10e0, None]
 init_scale_glm = [10e-4, 10e-3, 10e-2, 0.5, 10e-1, 10e0, 10e1]
 
