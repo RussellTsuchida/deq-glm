@@ -36,20 +36,21 @@ class DEQGLMConv(nn.Module):
                 self.conv2 = nn.Conv2d(n_channels, n_channels, kernel_size, 
                         padding=kernel_size//2, bias=False)
 
-                self._init_params(init_type, input_dim, init_scale)
+                self.init_params(init_type, input_dim, init_scale)
                 self._init_act(act)
 
-            def _init_params(self, init_type, input_dim, init_scale):
+            def init_params(self, init_type, input_dim, init_scale):
                 self._init_kernel()
                 if init_type == 'random':
                     if not (init_scale is None):
                         self.conv1.weight.data.normal_(0, init_scale)
                         self.conv2.weight.data.normal_(0, init_scale)
+
                 elif init_type == 'informed':
                     k1, l1  = self._kernel_and_spec_norm(self.kernel_size, self.conv1.weight,
                         input_dim)
 
-                    lamb = l1*init_scale
+                    lamb = l1/init_scale
                     neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb))
                     K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb))
 
@@ -108,6 +109,7 @@ class DEQGLMConv(nn.Module):
                 
             def forward(self, z, y):
                 return self.act(self.conv1(z) + self.conv2(y))
+
         
         self.act = F.relu
         self.conv_features = ConvNet(num_in_channels, filter_size, self.act, init_type=init_type,
@@ -124,6 +126,19 @@ class DEQGLMConv(nn.Module):
     def forward(self, y):
         z = self.deq(y)
         return self.act(self.conv_output.conv1(z) + self.conv_output.conv2(y))
+
+    def init_params(self, init_type, input_dim, init_scale, seed = None):
+        if not (seed is None):
+            torch.manual_seed(seed)
+            np.random.seed(seed)
+
+        self.conv_features.init_params(init_type, input_dim, init_scale)
+        self.conv_output.init_params(init_type, input_dim, init_scale)
+        if init_type == 'informed':
+            self.conv_output.conv1.weight = self.conv_features.conv1.weight
+            self.conv_output.conv2.weight = self.conv_features.conv2.weight
+
+        self.spec_norm = (self.conv_features.spec_norm + self.conv_output.spec_norm)/2
 
 
 class ResNetLayer(nn.Module):
@@ -388,6 +403,9 @@ class DEQFixedPoint(nn.Module):
             res.append((f0 - x).norm().item() / (1e-5 + f0.norm().item()))
             if (res[-1] < tol):
                 break
+            if torch.isnan(f0).any() or torch.isinf(f0).any():
+                break
+
         return f0, res
 
     def _init_solver(self, solver):

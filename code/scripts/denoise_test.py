@@ -22,8 +22,11 @@ OUTPUT_DIR  = 'outputs/cifar10/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
 BATCH_SIZE  = 100
 NOISE_STD   = 0.2
-PLOT        = True
+PLOT        = False
 NUM_STACK   = 1
+SPEC_START  = -2
+SPEC_STOP   = 1
+SPEC_NUM    = 25
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 matplotlib_config()
@@ -36,9 +39,9 @@ cifar10_test = datasets.CIFAR10(".", train=False, download=True, transform=trans
 
 """
 cifar10_train = Subset(cifar10_train,
-    np.random.choice(np.arange(50000),25000,replace=False))
+    np.random.choice(np.arange(50000),250,replace=False))
 cifar10_test = Subset(cifar10_test, 
-    np.random.choice(np.arange(10000),5000,replace=False))
+    np.random.choice(np.arange(10000),100,replace=False))
 """
 
 train_loader = DataLoader(cifar10_train, batch_size = BATCH_SIZE, shuffle=True, num_workers=4)
@@ -91,24 +94,26 @@ def epoch(loader, model, opt=None, lr_scheduler=None, plot=False):
     
     return total_loss / len(loader.dataset)
 
-experiment_data = np.zeros((6, MAX_EPOCHS+2, 7))
+
+################################################# The actual training loop
 init_types = ['informed', 'random']
-init_scale_random = [10e-5, 10e-4, 10e-3, 10e-2, 10e-1, 10e0, None]
-init_scale_glm = [10e-4, 10e-3, 10e-2, 0.5, 10e-1, 10e0, 10e1]
+init_scales = np.logspace(SPEC_START, SPEC_STOP, num=SPEC_NUM)
+experiment_data = np.zeros((2*len(init_types), MAX_EPOCHS+2, SPEC_NUM))
 
-for m_idx, initialise_as_glm in enumerate(init_types):
-    start = time.time()
-    ################################## Initialise the Model
-    if initialise_as_glm == 'informed':
-        init_scales = init_scale_glm
-    else:
-        init_scales = init_scale_random
+model = DEQGLMConv(3*NUM_STACK, 3, init_type=init_types[0], input_dim=(32,32),
+    init_scale = init_scales[0]).to(device)
 
+for m_idx, init_type in enumerate(init_types):
     for init_idx, init_scale in enumerate(init_scales):
-        model = DEQGLMConv(3*NUM_STACK, 3, init_type=initialise_as_glm, input_dim=(32,32),
-            init_scale = init_scale).to(device)
+        
+        start = time.time()
+        ################################## Initialise the Model
+        if init_type == 'random':
+            init_scale = init_scale/10
+        model.init_params(init_type, (32, 32), init_scale, seed=SEED)
+        model.to(device)
 
-        ################################## Optimise, minimising the cross entropy loss
+        ################################## Optimise, minimising the L2 loss
         opt = optim.Adam(model.parameters(), lr=1e-3)
         print("# Parmeters: ", sum(a.numel() for a in model.parameters()))
 
@@ -121,12 +126,12 @@ for m_idx, initialise_as_glm in enumerate(init_types):
         for i in range(MAX_EPOCHS+1):
             if i == 0:
                 train_err[i] = epoch(train_loader, model)
-                plot = initialise_as_glm + '_0'
+                plot = init_type + '_0'
             else:
                 train_err[i] = epoch(train_loader, model, opt, scheduler)
                 plot = False
             if i == MAX_EPOCHS:
-                plot = initialise_as_glm + '_' + str(i)
+                plot = init_type + '_' + str(i)
             test_err[i] = epoch(test_loader, model, plot = plot)
             print('  ' + str(i).zfill(2) + ' |   ' + str(train_err[i]) + '  |  ' + str(test_err[i]))
         
@@ -137,5 +142,5 @@ for m_idx, initialise_as_glm in enumerate(init_types):
         experiment_data[2*m_idx,    0, init_idx] = model.spec_norm
         experiment_data[2*m_idx+1,  0, init_idx] = model.spec_norm
         
-np.save(OUTPUT_DIR + str(SEED).zfill(4) + '.csv', experiment_data)
+np.save(OUTPUT_DIR + str(SEED).zfill(4), experiment_data)
 
