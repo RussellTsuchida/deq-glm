@@ -82,15 +82,17 @@ class DEQGLMConv(nn.Module):
                 alpha = 3
                 ls_list = 1/np.random.gamma(alpha, 1/beta, param.shape[0])
                 nu_list = np.random.exponential(0.5, param.shape[1])
+
                 k = np.zeros((param.shape[0], param.shape[1], kernel_size, kernel_size),
                     dtype=np.float32)
                 for ls_idx, ls in enumerate(ls_list):
-                    for nu_idx, nu in enumerate(nu_list):
+                    for nu_idx, nu in enumerate(nu_list[:ls_idx+1]):
                         var = 1/np.random.gamma(alpha, 1/(beta))
                         ksub = self.matern(mid, X, var, ls, nu).\
                         reshape((kernel_size, kernel_size)).astype(np.float32)
                         ksub[int(mid[0,0]), int(mid[0,0])] = var
                         k[ls_idx, nu_idx, :, :] = ksub
+                        k[nu_idx, ls_idx, :, :] = ksub
                 
                 return k, self._spec_norm(k, input_dim)
 
