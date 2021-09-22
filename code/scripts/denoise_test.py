@@ -37,12 +37,6 @@ np.random.seed(SEED)
 cifar10_train = datasets.CIFAR10(".", train=True, download=True, transform=transforms.ToTensor())
 cifar10_test = datasets.CIFAR10(".", train=False, download=True, transform=transforms.ToTensor())
 
-"""
-cifar10_train = Subset(cifar10_train,
-    np.random.choice(np.arange(50000),250,replace=False))
-cifar10_test = Subset(cifar10_test, 
-    np.random.choice(np.arange(10000),100,replace=False))
-"""
 
 train_loader = DataLoader(cifar10_train, batch_size = BATCH_SIZE, shuffle=True, num_workers=4)
 test_loader = DataLoader(cifar10_test, batch_size = BATCH_SIZE, shuffle=False, num_workers=4)
