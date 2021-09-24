@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 import sys
 
-SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
+SEED = 0 if len(sys.argv) == 1 else int(sys.argv[1])
 
 torch.manual_seed(SEED)
 np.random.seed(SEED)
@@ -37,5 +37,6 @@ def cifar10_tensor(cifar10_train, cifar10_test):
     cifar10_test_blur = blur_dataset(cifar10_test)
     cifar10_train_dataset = TensorDataset(torch.Tensor(cifar10_train_blur), torch.Tensor(cifar10_train.data))
     cifar10_test_dataset = TensorDataset(torch.Tensor(cifar10_test_blur), torch.Tensor(cifar10_test.data))
+    
     return cifar10_train_dataset, cifar10_test_dataset
 
