@@ -8,115 +8,177 @@ import scipy.spatial as sp
 import scipy.special as spec
 
 class ConvNet(nn.Module):
-    def __init__(self, n_channels, n_inner_channels, kernel_size=3):
+    def __init__(self, n_channels, kernel_size=3, act=None, init_type='random',
+        init_scale = 0.01,input_dim=(3,32,32)):
         super().__init__()
-        self.conv1 = nn.Conv2d(n_channels, n_inner_channels, kernel_size, 
+        self.kernel_size = kernel_size
+        self.conv1 = nn.Conv2d(n_channels, n_channels, kernel_size, 
                 padding=kernel_size//2, bias=False)
-        self.conv2 = nn.Conv2d(n_inner_channels, n_channels, kernel_size, 
+        self.conv2 = nn.Conv2d(n_channels, n_channels, kernel_size, 
                 padding=kernel_size//2, bias=False)
-        self.conv2.weight.data.normal_(0, 0.01)
-        self.conv1.weight.data.normal_(0, 0.01)
+
+        self.init_params(init_type, input_dim, init_scale)
+        self._init_act(act)
+
+    def init_params(self, init_type, input_dim, init_scale):
+        self._init_kernel()
+        if init_type == 'random':
+            if not (init_scale is None):
+                interval = init_scale*np.sqrt(12)/2
+                #self.conv1.weight.data.normal_(0, init_scale)
+                #self.conv2.weight.data.normal_(0, init_scale)
+                self.conv1.weight.data.uniform_(-interval, interval)
+                self.conv2.weight.data.uniform_(-interval, interval)
+
+        elif init_type == 'informed':
+            k1, l1  = self._kernel_and_spec_norm(self.kernel_size, self.conv1.weight,
+                input_dim)
+
+            lamb = l1/init_scale
+            neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb))
+            K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb))
+
+            self.conv1.weight = nn.parameter.Parameter(neg_K_norm(k1))
+            self.conv2.weight = nn.parameter.Parameter(K_norm(k1))
         
-    def forward(self, z, x):
-        y = F.relu(self.conv1(z))
-        return F.relu(z + self.conv2(y))
+        print(self._spec_norm(self.conv1.weight.detach().cpu().numpy(), input_dim))
+        self.spec_norm = (\
+            self._spec_norm(self.conv1.weight.detach().cpu().numpy(), input_dim)+\
+            self._spec_norm(self.conv2.weight.detach().cpu().numpy(),input_dim))/2
+
+    def _init_kernel(self):
+        #kernel = lambda x1, x2, ls: 1/(2*np.pi*ls)*(np.exp(-\
+        #        sp.distance.cdist(x1, x2, 'sqeuclidean')/(2*ls))).\
+        #        astype(np.float32)
+
+        kernel = lambda x1, x2, ls: np.exp(-\
+                sp.distance.cdist(x1, x2, 'sqeuclidean')/(2*ls**2)).\
+                astype(np.float32)
+
+        self.kernel = kernel
+        scaled_dist = lambda x1, x2, ls, nu: np.sqrt(2*nu)*\
+            (sp.distance.cdist(x1, x2, 'euclidean')/ls).astype(np.float32)
+
+        self.matern = lambda x1, x2, var, ls, nu: var*\
+            spec.kv(nu, scaled_dist(x1, x2, ls, nu))*\
+            scaled_dist(x1, x2, ls, nu)**nu*\
+            (2**(1-nu))/(spec.gamma(nu))
+
+    def _kernel_and_spec_norm(self, kernel_size, param, input_dim):
+        assert not (input_dim is None)
+        x = np.arange(0, kernel_size, 1).astype(np.int)
+        X = np.transpose([np.tile(x, len(x)), np.repeat(x, len(x))])
+        mid = (kernel_size + 1)/2-1
+        mid = np.asarray([[mid, mid]])
+
+        beta = 4
+        alpha = 3
+        #ls_list = 1/np.random.gamma(alpha, 1/beta, param.shape[0])
+        #nu_list = np.random.exponential(0.5, param.shape[1])
+
+        ls_list = np.random.uniform(0, 4, param.shape[0])
+        nu_list = np.random.uniform(0, 4, param.shape[1])
+
+        k = np.zeros((param.shape[0], param.shape[1], kernel_size, kernel_size),
+            dtype=np.float32)
+        for ls_idx, ls in enumerate(ls_list):
+            for nu_idx, nu in enumerate(nu_list[:ls_idx+1]):
+                #var = 1/np.random.gamma(alpha, 1/(beta))
+                var = 1
+                #ksub = self.matern(mid, X, var, ls, nu).\
+                #reshape((kernel_size, kernel_size)).astype(np.float32)
+
+                ksub = self.kernel(mid, X, ls).\
+                reshape((kernel_size, kernel_size)).astype(np.float32)
+                
+                #if (abs(ls_idx -  nu_idx) % 3) == 0:
+                if abs(ls_idx -  nu_idx) == 0:
+                    diag = 3
+                else:
+                    diag = 1
+                ksub[int(mid[0,0]), int(mid[0,0])] = var
+
+                k[ls_idx, nu_idx, :, :] = ksub*diag
+                k[nu_idx, ls_idx, :, :] = ksub*diag
+        
+        return k, self._spec_norm(k, input_dim)
+
+    def _spec_norm(self, k, input_dim):
+        k_reshape = k.swapaxes(0,2)
+        k_reshape = k_reshape.swapaxes(1,3)
+        transforms = np.fft.fft2(k_reshape, input_dim, axes=[0, 1])
+        svs = np.linalg.svd(transforms, compute_uv=False)
+        lamb = np.amax(svs)
+        return  lamb
+
+    def _init_act(self, act):
+        if act is None:
+            act = lambda x: x
+        self.act = act
+        
+    def forward(self, z, y):
+        return self.act(self.conv1(z) + self.conv2(y))
+
+class ChannelPool(nn.MaxPool1d):
+    def forward(self, input):
+        n, c, w, h = input.size()
+        input = input.view(n, c, w * h).permute(0, 2, 1)
+        pooled = F.max_pool1d(
+            input,
+            self.kernel_size,
+            self.stride,
+            self.padding,
+            self.dilation,
+            self.ceil_mode,
+            self.return_indices,
+        )
+        _, _, c = pooled.size()
+        pooled = pooled.permute(0, 2, 1)
+        return pooled.view(n, c, w, h)
+
+class ChannelPoolAvg(nn.AvgPool1d):
+    def forward(self, input):
+        n, c, w, h = input.size()
+        input = input.view(n, c, w * h).permute(0, 2, 1)
+        pooled = F.avg_pool1d(
+            input,
+            self.kernel_size,
+            self.stride,
+            self.padding,
+            self.ceil_mode,
+            self.count_include_pad,
+        )
+        _, _, c = pooled.size()
+        pooled = pooled.permute(0, 2, 1)
+        return pooled.view(n, c, w, h)
 
 class DEQGLMConv(nn.Module):
     def __init__(self, num_in_channels, filter_size=3, solver=None, init_type='random',
-        input_dim=(3,32,32), init_scale = 0.1, **kwargs):
+        input_dim=(3,32,32), init_scale = 0.1, num_hidden = None, **kwargs):
         super().__init__()
+        if num_hidden is None:
+            num_hidden = num_in_channels
+            self.conv_front = lambda x: x
+            self.conv_end = lambda x: x
+            self.act_extra = lambda x: x
+        else:
+            #self.conv_front = nn.Conv2d(num_in_channels, num_hidden, filter_size,
+            #padding=filter_size//2, bias=False)
+            #self.conv_end = nn.Conv2d(num_hidden, num_in_channels, filter_size,
+            #padding=filter_size//2, bias=False)
+            #self.act_extra = F.relu
+            self.act_extra = lambda x: x
+            self.conv_front = lambda x: torch.tile(x, [1, num_hidden, 1, 1])/num_hidden
+            self.conv_end = lambda x: x[:,:num_in_channels,:,:]*num_hidden
+            #self.conv_front = lambda x: torch.repeat_interleave(x, num_hidden, dim=1)
+            #self.conv_end = ChannelPool(num_hidden, num_hidden)
 
-        class ConvNet(nn.Module):
-            def __init__(self, n_channels, kernel_size=3, act=None, init_type='random',
-                init_scale = 0.01,input_dim=(3,32,32)):
-                super().__init__()
-                self.kernel_size = kernel_size
-                self.conv1 = nn.Conv2d(n_channels, n_channels, kernel_size, 
-                        padding=kernel_size//2, bias=False)
-                self.conv2 = nn.Conv2d(n_channels, n_channels, kernel_size, 
-                        padding=kernel_size//2, bias=False)
-
-                self.init_params(init_type, input_dim, init_scale)
-                self._init_act(act)
-
-            def init_params(self, init_type, input_dim, init_scale):
-                self._init_kernel()
-                if init_type == 'random':
-                    if not (init_scale is None):
-                        self.conv1.weight.data.normal_(0, init_scale)
-                        self.conv2.weight.data.normal_(0, init_scale)
-
-                elif init_type == 'informed':
-                    k1, l1  = self._kernel_and_spec_norm(self.kernel_size, self.conv1.weight,
-                        input_dim)
-
-                    lamb = l1/init_scale
-                    neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb))
-                    K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb))
-
-                    self.conv1.weight = nn.parameter.Parameter(neg_K_norm(k1))
-                    self.conv2.weight = nn.parameter.Parameter(K_norm(k1))
-                
-                print(self._spec_norm(self.conv1.weight.detach().cpu().numpy(), input_dim))
-                self.spec_norm = (\
-                    self._spec_norm(self.conv1.weight.detach().cpu().numpy(), input_dim)+\
-                    self._spec_norm(self.conv2.weight.detach().cpu().numpy(),input_dim))/2
-
-            def _init_kernel(self):
-                scaled_dist = lambda x1, x2, ls, nu: np.sqrt(2*nu)*\
-                    (sp.distance.cdist(x1, x2, 'euclidean')/ls).astype(np.float32)
-
-                self.matern = lambda x1, x2, var, ls, nu: var*\
-                    spec.kv(nu, scaled_dist(x1, x2, ls, nu))*\
-                    scaled_dist(x1, x2, ls, nu)**nu*\
-                    (2**(1-nu))/(spec.gamma(nu))
-
-            def _kernel_and_spec_norm(self, kernel_size, param, input_dim):
-                assert not (input_dim is None)
-                x = np.arange(0, kernel_size, 1).astype(np.int)
-                X = np.transpose([np.tile(x, len(x)), np.repeat(x, len(x))])
-                mid = (kernel_size + 1)/2-1
-                mid = np.asarray([[mid, mid]])
-
-                beta = 4
-                alpha = 3
-                ls_list = 1/np.random.gamma(alpha, 1/beta, param.shape[0])
-                nu_list = np.random.exponential(0.5, param.shape[1])
-
-                k = np.zeros((param.shape[0], param.shape[1], kernel_size, kernel_size),
-                    dtype=np.float32)
-                for ls_idx, ls in enumerate(ls_list):
-                    for nu_idx, nu in enumerate(nu_list[:ls_idx+1]):
-                        var = 1/np.random.gamma(alpha, 1/(beta))
-                        ksub = self.matern(mid, X, var, ls, nu).\
-                        reshape((kernel_size, kernel_size)).astype(np.float32)
-                        ksub[int(mid[0,0]), int(mid[0,0])] = var
-                        k[ls_idx, nu_idx, :, :] = ksub
-                        k[nu_idx, ls_idx, :, :] = ksub
-                
-                return k, self._spec_norm(k, input_dim)
-
-            def _spec_norm(self, k, input_dim):
-                k_reshape = k.swapaxes(0,2)
-                k_reshape = k_reshape.swapaxes(1,3)
-                transforms = np.fft.fft2(k_reshape, input_dim, axes=[0, 1])
-                svs = np.linalg.svd(transforms, compute_uv=False)
-                lamb = np.amax(svs)
-                return  lamb
-
-            def _init_act(self, act):
-                if act is None:
-                    act = lambda x: x
-                self.act = act
-                
-            def forward(self, z, y):
-                return self.act(self.conv1(z) + self.conv2(y))
-
-        
         self.act = F.relu
-        self.conv_features = ConvNet(num_in_channels, filter_size, self.act, init_type=init_type,
+        #self.act = F.leaky_relu
+        #self.act = F.sigmoid
+        self.conv_features = ConvNet(num_hidden*num_in_channels, filter_size, self.act, init_type=init_type,
             input_dim = input_dim, init_scale=init_scale)
-        self.conv_output = ConvNet(num_in_channels, filter_size, init_type=init_type, 
+        self.conv_output = ConvNet(num_hidden*num_in_channels, filter_size, init_type=init_type, 
             input_dim = input_dim, init_scale=init_scale)
         if init_type == 'informed':
             self.conv_output.conv1.weight = self.conv_features.conv1.weight
@@ -125,9 +187,15 @@ class DEQGLMConv(nn.Module):
         self.spec_norm = (self.conv_features.spec_norm + self.conv_output.spec_norm)/2
         self.deq = DEQFixedPoint(self.conv_features, solver, **kwargs)
 
+
     def forward(self, y):
+        y = self.act_extra(self.conv_front(y))
+
         z = self.deq(y)
-        return self.act(self.conv_output.conv1(z) + self.conv_output.conv2(y))
+        deq_out = self.act(self.conv_output.conv1(z) + self.conv_output.conv2(y))
+        out = self.act_extra(self.conv_end(deq_out))
+
+        return out
 
     def init_params(self, init_type, input_dim, init_scale, seed = None):
         if not (seed is None):

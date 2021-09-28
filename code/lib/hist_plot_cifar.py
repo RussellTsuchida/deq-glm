@@ -113,23 +113,66 @@ def _read_csvs(file_dir):
     return all_data
 
 if __name__ == '__main__':
-    DIR = 'outputs/cifar10/'
+    DIR = 'outputs/cifar10/conv14/'
     matplotlib_config()
 
     data = _read_csvs(DIR)
     
-    for test_or_train in ['Test', 'Train']:
+    for epoch in range(data.shape[1]-1):
+        test_glm = data[1,epoch+1,:,:]
+        test_rand = data[3,epoch+1,:,:]
+
+        test_glm[np.where(test_glm == np.inf)]  = np.nan
+        test_rand[np.where(test_rand == np.inf)]  = np.nan
+
+        max_glm = np.nanmax(test_glm, axis=1)
+        max_rand = np.nanmax(test_rand, axis=1)
+
+        inds = np.where(np.isnan(test_glm))
+        test_glm[inds] = np.take(max_glm, inds[0])
+
+        inds = np.where(np.isnan(test_rand))
+        test_rand[inds] = np.take(max_rand, inds[0])
+
+        best_glm = np.nanargmin(np.nanmean(test_glm, axis=1))
+        best_rand = np.nanargmin(np.nanmean(test_rand, axis=1))
+
+        mean_glm = np.nanmin(np.nanmean(test_glm, axis=1))
+        mean_rand = np.nanmin(np.nanmean(test_rand, axis=1))
+
+        std_glm = np.sqrt(np.nanvar(test_glm, axis=1))[best_glm]
+        std_rand = np.sqrt(np.nanvar(test_rand, axis=1))[best_rand]
+
+        num_nans_glm = np.count_nonzero(np.isnan(test_glm[best_glm, :]))
+        num_nans_rand = np.count_nonzero(np.isnan(test_rand[best_rand, :]))
+    
+        print(epoch)
+        print('glm')
+        print(mean_glm)
+        print(np.median(np.nanmean(test_glm, axis=1)))
+        print(std_glm)
+
+        print('rand')
+        print(mean_rand)
+        print(np.median(np.nanmean(test_rand, axis=1)))
+        print(std_rand)
+    
+    for test_or_train in ['Test']:
         plot_epochs_individually(DIR, data, log=True, test_or_train = test_or_train)
         plot_epochs_individually(DIR, data, log=False, test_or_train = test_or_train)
-        plot_epochs_individually(DIR, data, log=True, ylim=1e-2, test_or_train = test_or_train)
-        plot_epochs_individually(DIR, data, log=False, ylim=1e-2, 
+        #plot_epochs_individually(DIR, data, log=True, ylim=1e-2, test_or_train = test_or_train)
+        #plot_epochs_individually(DIR, data, log=False, ylim=1e-2, 
+        #test_or_train = test_or_train)
+        plot_epochs_individually(DIR, data, log=True, ylim=2e-2,
+        test_or_train = test_or_train)
+        plot_epochs_individually(DIR, data, log=False, ylim=2e-2,
         test_or_train = test_or_train)
         plot_epochs_individually(DIR, data, log=True, ylim=6.5e-3,
         test_or_train = test_or_train)
         plot_epochs_individually(DIR, data, log=False, ylim=6.5e-3,
         test_or_train = test_or_train)
-        plot_epochs_individually(DIR, data, log=True, ylim=7e-3,
-        test_or_train = test_or_train)
-        plot_epochs_individually(DIR, data, log=False, ylim=7e-3,
-        test_or_train = test_or_train)
+        #plot_epochs_individually(DIR, data, log=True, ylim=7e-3,
+        #test_or_train = test_or_train)
+        #plot_epochs_individually(DIR, data, log=False, ylim=7e-3,
+        #test_or_train = test_or_train)
 
