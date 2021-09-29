@@ -18,7 +18,7 @@ import time
 MAX_EPOCHS  = 5
 CHANNELS_1  = 3
 CHANNELS_2  = 3
-OUTPUT_DIR  = 'outputs/cifar10/conv14/'
+OUTPUT_DIR  = 'outputs/cifar10/conv16/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
 BATCH_SIZE  = 100
 NOISE_STD   = 0.2
@@ -26,7 +26,7 @@ PLOT        = False
 SPEC_START  = -2
 SPEC_STOP   = 1
 SPEC_NUM    = 25
-NUM_STACK   = 3
+NUM_STACK   = 16
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 matplotlib_config()

@@ -91,8 +91,8 @@ class ConvNet(nn.Module):
                 ksub = self.kernel(mid, X, ls).\
                 reshape((kernel_size, kernel_size)).astype(np.float32)
                 
-                #if (abs(ls_idx -  nu_idx) % 3) == 0:
-                if abs(ls_idx -  nu_idx) == 0:
+                if (abs(ls_idx -  nu_idx) % 3) == 0:
+                #if abs(ls_idx -  nu_idx) == 0:
                     diag = 3
                 else:
                     diag = 1
@@ -162,23 +162,23 @@ class DEQGLMConv(nn.Module):
             self.conv_end = lambda x: x
             self.act_extra = lambda x: x
         else:
-            #self.conv_front = nn.Conv2d(num_in_channels, num_hidden, filter_size,
-            #padding=filter_size//2, bias=False)
-            #self.conv_end = nn.Conv2d(num_hidden, num_in_channels, filter_size,
-            #padding=filter_size//2, bias=False)
-            #self.act_extra = F.relu
-            self.act_extra = lambda x: x
-            self.conv_front = lambda x: torch.tile(x, [1, num_hidden, 1, 1])/num_hidden
-            self.conv_end = lambda x: x[:,:num_in_channels,:,:]*num_hidden
+            self.conv_front = nn.Conv2d(num_in_channels, num_hidden, filter_size,
+            padding=filter_size//2, bias=False)
+            self.conv_end = nn.Conv2d(num_hidden, num_in_channels, filter_size,
+            padding=filter_size//2, bias=False)
+            self.act_extra = F.relu
+            #self.act_extra = lambda x: x
+            #self.conv_front = lambda x: torch.tile(x, [1, num_hidden, 1, 1])
+            #self.conv_end = lambda x: x[:,:num_in_channels,:,:]
             #self.conv_front = lambda x: torch.repeat_interleave(x, num_hidden, dim=1)
             #self.conv_end = ChannelPool(num_hidden, num_hidden)
 
         self.act = F.relu
         #self.act = F.leaky_relu
         #self.act = F.sigmoid
-        self.conv_features = ConvNet(num_hidden*num_in_channels, filter_size, self.act, init_type=init_type,
+        self.conv_features = ConvNet(num_hidden, filter_size, self.act, init_type=init_type,
             input_dim = input_dim, init_scale=init_scale)
-        self.conv_output = ConvNet(num_hidden*num_in_channels, filter_size, init_type=init_type, 
+        self.conv_output = ConvNet(num_hidden, filter_size, init_type=init_type, 
             input_dim = input_dim, init_scale=init_scale)
         if init_type == 'informed':
             self.conv_output.conv1.weight = self.conv_features.conv1.weight
