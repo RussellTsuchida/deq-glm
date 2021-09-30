@@ -1,7 +1,10 @@
 import numpy as np
 import scipy.spatial as sp
 import torch
-
+from torch.utils.data import Dataset
+import tifffile
+import os
+import natsort
 
 # TODO make SyntheticData abstract class
 class SequenceOneDimension(object):
@@ -120,4 +123,24 @@ class CopyMemory(object):
         ret = np.swapaxes(ret, 0, 2)
         return ret
         
+class HyperSpectralData(Dataset):
+    def __init__(self, main_dir, transform, num_channels=None):
+        self.main_dir = main_dir
+        self.transform = transform
+        all_imgs = os.listdir(main_dir)
+        self.total_imgs = natsort.natsorted(all_imgs)
+        self.num_channels = num_channels
 
+    def __len__(self):
+        return len(self.total_imgs)
+
+    def __getitem__(self, idx):
+        tiffloader = lambda x: tifffile.imread(x)
+        img_loc = os.path.join(self.main_dir, self.total_imgs[idx])
+        image = (tiffloader(img_loc)/255).astype(np.float32)
+        if not (self.num_channels is None):
+            image = image[:self.num_channels, :, :]
+        image = np.swapaxes(image, 0, 2)
+        tensor_image = self.transform(image)
+        # Return with a dummy class of 0 to make compatible with cifar
+        return [tensor_image, 0]

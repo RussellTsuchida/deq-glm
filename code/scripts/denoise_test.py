@@ -14,11 +14,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import time
+from ..lib.data import HyperSpectralData
 
 MAX_EPOCHS  = 5
 CHANNELS_1  = 3
 CHANNELS_2  = 3
-OUTPUT_DIR  = 'outputs/cifar10/conv16/'
+OUTPUT_DIR  = 'outputs/cifar10/conv17/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
 BATCH_SIZE  = 100
 NOISE_STD   = 0.2
@@ -26,29 +27,35 @@ PLOT        = False
 SPEC_START  = -2
 SPEC_STOP   = 1
 SPEC_NUM    = 25
-NUM_STACK   = 16
+NUM_STACK   = None
+FILTER_SIZE = 5
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-matplotlib_config()
+device_idx = SEED % torch.cuda.device_count()
+print(device_idx)
+device = torch.device("cuda:" + str(device_idx) if torch.cuda.is_available() else "cpu")
+
+
 torch.manual_seed(SEED)
 np.random.seed(SEED)
 
 ################################## Load CIFAR10
-cifar10_train = datasets.CIFAR10(".", train=True, download=True, transform=transforms.ToTensor())
-cifar10_test = datasets.CIFAR10(".", train=False, download=True, transform=transforms.ToTensor())
+#cifar10_train = datasets.CIFAR10(".", train=True, download=True, transform=transforms.ToTensor())
+#cifar10_test = datasets.CIFAR10(".", train=False, download=True, transform=transforms.ToTensor())
 
-"""
+print("initialising data...")
+cifar10_train = HyperSpectralData("./hsi_road/images/", transforms.ToTensor(), num_channels=3)
+cifar10_test = HyperSpectralData("./hsi_road/images/", transforms.ToTensor(), num_channels=3)
+
 cifar10_train = Subset(cifar10_train,
-    np.random.choice(np.arange(50000),5000,replace=False))
+    np.random.choice(np.arange(2000),500,replace=False))
 cifar10_test = Subset(cifar10_test, 
-    np.random.choice(np.arange(10000),500,replace=False))
-"""
+    np.random.choice(np.arange(2000),200,replace=False))
 
 train_loader = DataLoader(cifar10_train, batch_size = BATCH_SIZE, shuffle=True, num_workers=4)
 test_loader = DataLoader(cifar10_test, batch_size = BATCH_SIZE, shuffle=False, num_workers=4)
 
-noise_train = NOISE_STD * torch.randn( [len(cifar10_train)]+ list(cifar10_train[0][0].size())).to(device)
-noise_test = NOISE_STD * torch.randn( [len(cifar10_test)]+ list(cifar10_test[0][0].size())).to(device)
+noise_train = NOISE_STD * torch.randn( [len(cifar10_train)]+ list(cifar10_train[0][0].size()))#.to(device)
+noise_test = NOISE_STD * torch.randn( [len(cifar10_test)]+ list(cifar10_test[0][0].size()))#.to(device)
 
 ################################## One training or testing iteration
 def epoch(loader, model, opt=None, lr_scheduler=None, plot=False, noise=None):
@@ -56,9 +63,10 @@ def epoch(loader, model, opt=None, lr_scheduler=None, plot=False, noise=None):
     model.eval() if opt is None else model.train()
     batch_num = 0
     for X,y in loader:
-        X = X.to(device)
-        X = torch.tile(X, [1,1,1,1])
-        batch_noise = noise[batch_num*BATCH_SIZE:(batch_num+1)*BATCH_SIZE,:,:,:]
+    #for X in loader:
+        X = X#.to(device)
+        #X = torch.tile(X, [1,1,1,1])
+        batch_noise = noise[batch_num*BATCH_SIZE:(batch_num+1)*BATCH_SIZE,:,:,:]#.to(device)
         if batch_noise.shape[0] > X.shape[0]:
             batch_noise = batch_noise[:X.shape[0],:,:,:]
 
@@ -66,7 +74,7 @@ def epoch(loader, model, opt=None, lr_scheduler=None, plot=False, noise=None):
         X_noise = torch.clip(X_noise, 0, 1).to(device)
 
         Xp = model(X_noise)
-        loss = nn.MSELoss()(Xp,X)
+        loss = nn.MSELoss()(Xp,X.to(device))
         if opt:
             opt.zero_grad()
             loss.backward()
@@ -106,20 +114,23 @@ init_scales = np.concatenate([init_scales,
 experiment_data = np.zeros((2*len(init_types), MAX_EPOCHS+2, 
     init_scales.shape[0]))
 
+imsize = (list(cifar10_train[0][0].size())[1], list(cifar10_train[0][0].size())[2])
+num_filters = list(cifar10_train[0][0].size())[0]
 
+print("initialising model...")
+model = DEQGLMConv(num_filters, FILTER_SIZE, init_type=init_types[0], 
+        input_dim=imsize,
+        init_scale = init_scales[0], num_hidden=NUM_STACK).to(device)
 
-model = DEQGLMConv(3, 3, init_type=init_types[0], input_dim=(32,32),
-    init_scale = init_scales[0], num_hidden=NUM_STACK).to(device)
-
+print("training...")
 for m_idx, init_type in enumerate(init_types):
     for init_idx, init_scale in enumerate(init_scales):
         start = time.time()
 
-
         ################################## Initialise the Model
         if init_type == 'random':
             init_scale = init_scale/(10*1.9)
-        model.init_params(init_type, (32, 32), init_scale, seed=SEED)
+        model.init_params(init_type, imsize, init_scale, seed=SEED)
         model.to(device)
 
         ################################## Optimise, minimising the L2 loss

@@ -6,7 +6,7 @@ import matplotlib.ticker as mtick
 
 import glob
 
-from .plotters import matplotlib_config
+#from .plotters import matplotlib_config
 
 def plot_experiment_hist_one_row(file_dir, row, x=None, mode='max', ls='-',
     log = True, skip_first=False):
@@ -113,8 +113,8 @@ def _read_csvs(file_dir):
     return all_data
 
 if __name__ == '__main__':
-    DIR = 'outputs/cifar10/conv14/'
-    matplotlib_config()
+    DIR = 'outputs/cifar10/convam/'
+    #matplotlib_config()
 
     data = _read_csvs(DIR)
     

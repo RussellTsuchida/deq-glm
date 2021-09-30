@@ -90,14 +90,15 @@ class ConvNet(nn.Module):
 
                 ksub = self.kernel(mid, X, ls).\
                 reshape((kernel_size, kernel_size)).astype(np.float32)
-                
+                """
                 if (abs(ls_idx -  nu_idx) % 3) == 0:
                 #if abs(ls_idx -  nu_idx) == 0:
                     diag = 3
                 else:
                     diag = 1
                 ksub[int(mid[0,0]), int(mid[0,0])] = var
-
+                """
+                diag = 1
                 k[ls_idx, nu_idx, :, :] = ksub*diag
                 k[nu_idx, ls_idx, :, :] = ksub*diag
         
