@@ -15,11 +15,12 @@ import matplotlib.pyplot as plt
 import sys
 import time
 from ..lib.data import HyperSpectralData
+import math
 
 MAX_EPOCHS  = 5
 CHANNELS_1  = 3
 CHANNELS_2  = 3
-OUTPUT_DIR  = 'outputs/cifar10/conv17/'
+OUTPUT_DIR  = 'outputs/cifar10/8chan/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
 BATCH_SIZE  = 100
 NOISE_STD   = 0.2
@@ -29,11 +30,11 @@ SPEC_STOP   = 1
 SPEC_NUM    = 25
 NUM_STACK   = None
 FILTER_SIZE = 5
+NUM_CHANNELS= 8
 
 device_idx = SEED % torch.cuda.device_count()
 print(device_idx)
 device = torch.device("cuda:" + str(device_idx) if torch.cuda.is_available() else "cpu")
-
 
 torch.manual_seed(SEED)
 np.random.seed(SEED)
@@ -43,16 +44,23 @@ np.random.seed(SEED)
 #cifar10_test = datasets.CIFAR10(".", train=False, download=True, transform=transforms.ToTensor())
 
 print("initialising data...")
-cifar10_train = HyperSpectralData("./hsi_road/images/", transforms.ToTensor(), num_channels=3)
-cifar10_test = HyperSpectralData("./hsi_road/images/", transforms.ToTensor(), num_channels=3)
+cifar10_train = HyperSpectralData("/scratch1/tsu007/hsi_road/images/", transforms.ToTensor(),
+num_channels=NUM_CHANNELS)
+#cifar10_test = HyperSpectralData("/scratch1/tsu007/hsi_road/images/", transforms.ToTensor(),
+#num_channels=NUM_CHANNELS)
+cifar10_train, cifar10_test = torch.utils.data.random_split(cifar10_train,
+    [math.floor(6/7*len(cifar10_train)), math.ceil(1/7*len(cifar10_train))],
+    generator=torch.Generator().manual_seed(SEED))
 
-cifar10_train = Subset(cifar10_train,
-    np.random.choice(np.arange(2000),500,replace=False))
-cifar10_test = Subset(cifar10_test, 
-    np.random.choice(np.arange(2000),200,replace=False))
+#cifar10_train = Subset(cifar10_train,
+#    np.random.choice(np.arange(2000),500,replace=False))
+#cifar10_test = Subset(cifar10_test, 
+#    np.random.choice(np.arange(2000),200,replace=False))
 
 train_loader = DataLoader(cifar10_train, batch_size = BATCH_SIZE, shuffle=True, num_workers=4)
 test_loader = DataLoader(cifar10_test, batch_size = BATCH_SIZE, shuffle=False, num_workers=4)
+
+print('initialising noise...')
 
 noise_train = NOISE_STD * torch.randn( [len(cifar10_train)]+ list(cifar10_train[0][0].size()))#.to(device)
 noise_test = NOISE_STD * torch.randn( [len(cifar10_test)]+ list(cifar10_test[0][0].size()))#.to(device)
