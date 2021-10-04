@@ -26,9 +26,9 @@ PLOT        = False
 SPEC_START  = -2
 SPEC_STOP   = 1
 SPEC_NUM    = 25
-NUM_STACK   = None
 FILTER_SIZE = 5
 NUM_CHANNELS= 13
+DATASET     = 'hsi' # 'cifar'
 
 device_idx = SEED % torch.cuda.device_count()
 print(device_idx)
@@ -38,16 +38,15 @@ torch.manual_seed(SEED)
 np.random.seed(SEED)
 
 ################################## Load CIFAR10
-#cifar10_train = datasets.CIFAR10(".", train=True, download=True, transform=transforms.ToTensor())
-#cifar10_test = datasets.CIFAR10(".", train=False, download=True, transform=transforms.ToTensor())
-
 print("initialising data...")
-cifar10_train = HyperSpectralData("/scratch1/tsu007/hsi_road/images/", transforms.ToTensor(), num_channels=NUM_CHANNELS)
-#cifar10_test = HyperSpectralData("/scratch1/tsu007/hsi_road/images/", transforms.ToTensor(),
-#num_channels=NUM_CHANNELS)
-cifar10_train, cifar10_test = torch.utils.data.random_split(cifar10_train,
-    [math.floor(6/7*len(cifar10_train)), math.ceil(1/7*len(cifar10_train))],
-    generator=torch.Generator().manual_seed(SEED))
+if DATASET == 'cifar':
+    cifar10_train = datasets.CIFAR10(".", train=True, download=True, transform=transforms.ToTensor())
+    cifar10_test = datasets.CIFAR10(".", train=False, download=True, transform=transforms.ToTensor())
+else:
+    cifar10_train = HyperSpectralData("/scratch1/tsu007/hsi_road/images/", transforms.ToTensor(), num_channels=NUM_CHANNELS)
+    cifar10_train, cifar10_test = torch.utils.data.random_split(cifar10_train,
+        [math.floor(6/7*len(cifar10_train)), math.ceil(1/7*len(cifar10_train))],
+        generator=torch.Generator().manual_seed(SEED))
 
 #cifar10_train = Subset(cifar10_train,
 #    np.random.choice(np.arange(2000),500,replace=False))
@@ -58,7 +57,6 @@ train_loader = DataLoader(cifar10_train, batch_size = BATCH_SIZE, shuffle=True, 
 test_loader = DataLoader(cifar10_test, batch_size = BATCH_SIZE, shuffle=False, num_workers=4)
 
 print('initialising noise...')
-
 noise_train = NOISE_STD * torch.randn( [len(cifar10_train)]+ list(cifar10_train[0][0].size()))#.to(device)
 noise_test = NOISE_STD * torch.randn( [len(cifar10_test)]+ list(cifar10_test[0][0].size()))#.to(device)
 
@@ -68,9 +66,7 @@ def epoch(loader, model, opt=None, lr_scheduler=None, plot=False, noise=None):
     model.eval() if opt is None else model.train()
     batch_num = 0
     for X,y in loader:
-    #for X in loader:
-        X = X#.to(device)
-        #X = torch.tile(X, [1,1,1,1])
+        #X = X#.to(device)
         batch_noise = noise[batch_num*BATCH_SIZE:(batch_num+1)*BATCH_SIZE,:,:,:]#.to(device)
         if batch_noise.shape[0] > X.shape[0]:
             batch_noise = batch_noise[:X.shape[0],:,:,:]
@@ -125,7 +121,7 @@ num_filters = list(cifar10_train[0][0].size())[0]
 print("initialising model...")
 model = DEQGLMConv(num_filters, FILTER_SIZE, init_type=init_types[0], 
         input_dim=imsize,
-        init_scale = init_scales[0], num_hidden=NUM_STACK).to(device)
+        init_scale = init_scales[0], num_hidden=None).to(device)
 
 print("training...")
 for m_idx, init_type in enumerate(init_types):
