@@ -40,15 +40,18 @@ np.random.seed(SEED)
 
 ################################## Load CIFAR10
 if DATASET == 'cifar':
-	cifar10_train = datasets.CIFAR10(".", train=True, download=True, transform=transforms.ToTensor())
-	cifar10_test = datasets.CIFAR10(".", train=False, download=True, transform=transforms.ToTensor())
+    cifar10_train = datasets.CIFAR10(".", train=True, download=True, transform=transforms.ToTensor())
+    cifar10_test = datasets.CIFAR10(".", train=False, download=True, transform=transforms.ToTensor())
+    cifar10_train_dataset, cifar10_test_dataset = traintest_blur(cifar10_train, cifar10_test, MIN_SIGMA, MAX_SIGMA)
 elif DATASET == 'hsi':
-    cifar10_train = HyperSpectralData("/scratch1/tsu007/hsi_road/images/", transforms.ToTensor(), num_channels=NUM_CHANNELS)  
+    cifar10_train = HyperSpectralData("/scratch1/tsu007/hsi_road/images/",
+    transforms.ToTensor(), num_channels=NUM_CHANNELS)
+    cifar10_train_dataset, _ = traintest_blur(cifar10_train,
+    cifar10_train, MIN_SIGMA, MAX_SIGMA)
     cifar10_train, cifar10_test = torch.utils.data.random_split(cifar10_train, 
     [math.floor(6/7*len(cifar10_train)), math.ceil(1/7*len(cifar10_train))], 
     generator=torch.Generator().manual_seed(SEED))
 
-cifar10_train_dataset, cifar10_test_dataset = traintest_blur(cifar10_train, cifar10_test, MIN_SIGMA, MAX_SIGMA)
 train_loader = DataLoader(cifar10_train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 test_loader = DataLoader(cifar10_test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
