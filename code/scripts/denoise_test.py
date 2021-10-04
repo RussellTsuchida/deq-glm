@@ -18,11 +18,9 @@ from ..lib.data import HyperSpectralData
 import math
 
 MAX_EPOCHS  = 5
-CHANNELS_1  = 3
-CHANNELS_2  = 3
-OUTPUT_DIR  = 'outputs/cifar10/8chan/'
+OUTPUT_DIR  = 'outputs/cifar10/13chan/'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
-BATCH_SIZE  = 100
+BATCH_SIZE  = 10
 NOISE_STD   = 0.2
 PLOT        = False
 SPEC_START  = -2
@@ -30,7 +28,7 @@ SPEC_STOP   = 1
 SPEC_NUM    = 25
 NUM_STACK   = None
 FILTER_SIZE = 5
-NUM_CHANNELS= 8
+NUM_CHANNELS= 13
 
 device_idx = SEED % torch.cuda.device_count()
 print(device_idx)
@@ -44,8 +42,7 @@ np.random.seed(SEED)
 #cifar10_test = datasets.CIFAR10(".", train=False, download=True, transform=transforms.ToTensor())
 
 print("initialising data...")
-cifar10_train = HyperSpectralData("/scratch1/tsu007/hsi_road/images/", transforms.ToTensor(),
-num_channels=NUM_CHANNELS)
+cifar10_train = HyperSpectralData("/scratch1/tsu007/hsi_road/images/", transforms.ToTensor(), num_channels=NUM_CHANNELS)
 #cifar10_test = HyperSpectralData("/scratch1/tsu007/hsi_road/images/", transforms.ToTensor(),
 #num_channels=NUM_CHANNELS)
 cifar10_train, cifar10_test = torch.utils.data.random_split(cifar10_train,

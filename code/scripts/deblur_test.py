@@ -2,6 +2,7 @@
 from ..lib.deq import DEQGLMConv
 from ..lib.plotters import matplotlib_config
 from ..lib.data_deblur import traintest_blur
+from ..lib.data import HyperSpectralData
 
 # Torch
 import torch
@@ -15,20 +16,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import time
+import math
 
 MAX_EPOCHS  = 5
-CHANNELS_1  = 3
-CHANNELS_2  = 3
-OUTPUT_DIR  = 'outputs/cifar10-deblur/'
+OUTPUT_DIR  = 'outputs/cifar10-deblur/8chan'
 SEED        = 0 if len(sys.argv) == 1 else int(sys.argv[1])
-BATCH_SIZE  = 100
+BATCH_SIZE  = 10
 MIN_SIGMA   = 0
 MAX_SIGMA   = 3
-PLOT        = True
+PLOT        = False
 SPEC_START  = -2
 SPEC_STOP   = 1
 SPEC_NUM    = 25
-NUM_STACK   = 16
+NUM_STACK   = None
+FILTER_SIZE = 5
+NUM_CHANNELS= 8
+DATASET		= 'hsi'#'cifar'
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 matplotlib_config()
@@ -36,8 +39,14 @@ torch.manual_seed(SEED)
 np.random.seed(SEED)
 
 ################################## Load CIFAR10
-cifar10_train = datasets.CIFAR10(".", train=True, download=True, transform=transforms.ToTensor())
-cifar10_test = datasets.CIFAR10(".", train=False, download=True, transform=transforms.ToTensor())
+if DATASET == 'cifar':
+	cifar10_train = datasets.CIFAR10(".", train=True, download=True, transform=transforms.ToTensor())
+	cifar10_test = datasets.CIFAR10(".", train=False, download=True, transform=transforms.ToTensor())
+elif DATASET == 'hsi':
+    cifar10_train = HyperSpectralData("/scratch1/tsu007/hsi_road/images/", transforms.ToTensor(), num_channels=NUM_CHANNELS)  
+    cifar10_train, cifar10_test = torch.utils.data.random_split(cifar10_train, 
+    [math.floor(6/7*len(cifar10_train)), math.ceil(1/7*len(cifar10_train))], 
+    generator=torch.Generator().manual_seed(SEED))
 
 cifar10_train_dataset, cifar10_test_dataset = traintest_blur(cifar10_train, cifar10_test, MIN_SIGMA, MAX_SIGMA)
 train_loader = DataLoader(cifar10_train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
@@ -92,15 +101,16 @@ init_scales = np.concatenate([init_scales,
 experiment_data = np.zeros((2*len(init_types), MAX_EPOCHS+2, 
     init_scales.shape[0]))
 
+imsize = (list(cifar10_train[0][0].size())[1], list(cifar10_train[0][0].size())[    2])
+num_filters = list(cifar10_train[0][0].size())[0]
 
-
-model = DEQGLMConv(3, 3, init_type=init_types[0], input_dim=(32,32),
+model = DEQGLMConv(num_filters, FILTER_SIZE, init_type=init_types[0], 
+    input_dim=imsize,
     init_scale = init_scales[0], num_hidden=NUM_STACK).to(device)
 
 for m_idx, init_type in enumerate(init_types):
     for init_idx, init_scale in enumerate(init_scales):
         start = time.time()
-
 
         ################################## Initialise the Model
         if init_type == 'random':
