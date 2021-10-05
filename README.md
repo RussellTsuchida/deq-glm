@@ -1,23 +1,15 @@
-# deq-glm
+# DECLARATIVE NETS THAT ARE EQUILIBRIUM MODELS
 
-**CIFAR10 TEST**
-1. Download onto Bracewell. 
-2. Make a new empty folder at 
->/deq-glm/outputs/cifar10
-3. Download the CIFAR10 dataset. To do this, I had to run 
->python -m code.scripts.cifar_test 
+0. > pip install -r requirements.txt
 
-OUTSIDE of slurm, then terminate the job after the files are downloaded. Not sure why but slurm doesn't like downloading the file.
-
-4. Run
-> ./run_all_cifar.sh
-
-This will automatically load all modules and run 5 random seeds. You may change 
->for i in $(seq 0 5)
-
-on line 4 of run_all_cifar.sh to run 100 jobs in parallel.
-
-
-
-**REGRESSION TEST**
->python3 -m code.scripts.regression_test
+# Fully connected architecture experiments
+1. Make sure the directory pointed to by line 28 of code/scripts/regression_test.py exists
+2. ``` python -um code.scripts.regression_test <SEED> ```
+  where <SEED> is an integer representing the random seed. Run this multiple times for multiple random seeds.
+3. ```python -um code.lib.hist_plot```
+# Convolutional architecture experiments
+1. (optional) If you would like to use the HSI dataset, download and extract it using the instructions at https://github.com/NUST-Machine-Intelligence-Laboratory/hsi_road. That is, ``` wget https://hsiroad-sh.oss-cn-shanghai.aliyuncs.com/hsi_road.tar.gz``` and then ```tar -xvf hsi_road.tar.gz```. Delete the images/*_rgb.tiff files.
+2. Open code/scripts/denoise_test.py. Change the number of channels on line 30 to whatever you wish. Change line 31 to 'hsi' or 'cifar' depending on which dataset you would like to use. Make sure the directory pointed to by lin 21 exists --- this is where the experiment output data is stored. 
+3. ```python -um code.scripts.denoise_test <SEED>``` where <SEED> is an integer representing the random seed. This will do a full spectral norm sweep for a single seed. Repeat as many times as you wish.
+4. To plot the results, point to the experiment output data directory in line 116 of code/lib/hist_plot_cifar.py. Then run 
+  ```python -um code.lib.hist_plot_cifar```
