@@ -25,44 +25,25 @@ class ConvNet(nn.Module):
         if init_type == 'random':
             if not (init_scale is None):
                 interval = init_scale*np.sqrt(12)/2
-                #self.conv1.weight.data.normal_(0, init_scale)
-                #self.conv2.weight.data.normal_(0, init_scale)
-                self.conv1.weight.data.uniform_(-interval, interval)
-                self.conv2.weight.data.uniform_(-interval, interval)
+                self.conv1.weight.data.normal_(0, init_scale)
+                self.conv2.weight.data.normal_(0, init_scale)
+                #self.conv1.weight.data.uniform_(-interval, interval)
+                #self.conv2.weight.data.uniform_(-interval, interval)
 
         elif init_type == 'informed':
             k1, l1  = self._kernel_and_spec_norm(self.kernel_size, self.conv1.weight,
                 input_dim)
 
             lamb = l1/init_scale
-            neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb))
-            K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb))
 
-            self.conv1.weight = nn.parameter.Parameter(neg_K_norm(k1))
-            self.conv2.weight = nn.parameter.Parameter(K_norm(k1))
-        
-        print(self._spec_norm(self.conv1.weight.detach().cpu().numpy(), input_dim))
-        self.spec_norm = (\
-            self._spec_norm(self.conv1.weight.detach().cpu().numpy(), input_dim)+\
-            self._spec_norm(self.conv2.weight.detach().cpu().numpy(),input_dim))/2
+            self.conv1.weight = nn.parameter.Parameter(-torch.from_numpy(k1/lamb))
+            self.conv2.weight = nn.parameter.Parameter(torch.from_numpy(k1/lamb))
 
     def _init_kernel(self):
-        #kernel = lambda x1, x2, ls: 1/(2*np.pi*ls)*(np.exp(-\
-        #        sp.distance.cdist(x1, x2, 'sqeuclidean')/(2*ls))).\
-        #        astype(np.float32)
-
-        kernel = lambda x1, x2, ls: np.exp(-\
+        self.kernel = lambda x1, x2, ls: np.exp(-\
                 sp.distance.cdist(x1, x2, 'sqeuclidean')/(2*ls**2)).\
                 astype(np.float32)
 
-        self.kernel = kernel
-        scaled_dist = lambda x1, x2, ls, nu: np.sqrt(2*nu)*\
-            (sp.distance.cdist(x1, x2, 'euclidean')/ls).astype(np.float32)
-
-        self.matern = lambda x1, x2, var, ls, nu: var*\
-            spec.kv(nu, scaled_dist(x1, x2, ls, nu))*\
-            scaled_dist(x1, x2, ls, nu)**nu*\
-            (2**(1-nu))/(spec.gamma(nu))
 
     def _kernel_and_spec_norm(self, kernel_size, param, input_dim):
         assert not (input_dim is None)
@@ -71,37 +52,17 @@ class ConvNet(nn.Module):
         mid = (kernel_size + 1)/2-1
         mid = np.asarray([[mid, mid]])
 
-        beta = 4
-        alpha = 3
-        #ls_list = 1/np.random.gamma(alpha, 1/beta, param.shape[0])
-        #nu_list = np.random.exponential(0.5, param.shape[1])
-
         ls_list = np.random.uniform(0, 4, param.shape[0])
-        nu_list = np.random.uniform(0, 4, param.shape[1])
 
         k = np.zeros((param.shape[0], param.shape[1], kernel_size, kernel_size),
             dtype=np.float32)
         for ls_idx, ls in enumerate(ls_list):
-            for nu_idx, nu in enumerate(nu_list[:ls_idx+1]):
-                #var = 1/np.random.gamma(alpha, 1/(beta))
-                var = 1
-                #ksub = self.matern(mid, X, var, ls, nu).\
-                #reshape((kernel_size, kernel_size)).astype(np.float32)
-
-                ksub = self.kernel(mid, X, ls).\
+            ksub = self.kernel(mid, X, ls).\
                 reshape((kernel_size, kernel_size)).astype(np.float32)
-                """
-                if (abs(ls_idx -  nu_idx) % 3) == 0:
-                #if abs(ls_idx -  nu_idx) == 0:
-                    diag = 3
-                else:
-                    diag = 1
-                ksub[int(mid[0,0]), int(mid[0,0])] = var
-                """
-                diag = 1
-                k[ls_idx, nu_idx, :, :] = ksub*diag
-                k[nu_idx, ls_idx, :, :] = ksub*diag
-        
+            #for nu_idx, nu in enumerate(nu_list[:ls_idx+1]):
+            k[ls_idx, range(0, ls_idx+1), :, :] = ksub
+            #k[range(0, ls_idx+1), ls_idx, :, :] = ksub
+        k = (k +np.transpose(k, (1,0,2,3)))/2 
         return k, self._spec_norm(k, input_dim)
 
     def _spec_norm(self, k, input_dim):
@@ -185,7 +146,7 @@ class DEQGLMConv(nn.Module):
             self.conv_output.conv1.weight = self.conv_features.conv1.weight
             self.conv_output.conv2.weight = self.conv_features.conv2.weight
 
-        self.spec_norm = (self.conv_features.spec_norm + self.conv_output.spec_norm)/2
+        #self.spec_norm = (self.conv_features.spec_norm + self.conv_output.spec_norm)/2
         self.deq = DEQFixedPoint(self.conv_features, solver, **kwargs)
 
 
@@ -352,7 +313,7 @@ class ResNetLayerModified(nn.Module):
 
 class FullyConnectedLayer(nn.Module):
     def __init__(self, num_in, width, num_out, activation=None, x_init=False, 
-            kernel=None):
+            kernel=None, lamb_scale=1):
         """
         x_init (Bool or list(Torch Tensor)): If False, use random 
             initialisation. If True, use naive initialisation. If a list
@@ -362,6 +323,7 @@ class FullyConnectedLayer(nn.Module):
         self.num_in = num_in
         self.num_out = num_out
         self.width  = width
+        self.lamb_scale = lamb_scale
 
         self._init_kernel(kernel)
         self._init_activation(activation)
@@ -400,7 +362,7 @@ class FullyConnectedLayer(nn.Module):
         x = x_init[0]; x_star = x_init[1]
 
         K = self.kernel(x.numpy().T, x.numpy().T)
-        lamb = (np.linalg.norm(K, ord=2))
+        lamb = (np.linalg.norm(K, ord=2))*self.lamb_scale
 
         neg_K_norm = lambda K_in: torch.from_numpy(-copy.deepcopy(K_in)/(lamb))
         K_norm = lambda K_in:  torch.from_numpy(copy.deepcopy(K_in)/(lamb))
