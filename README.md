@@ -13,3 +13,6 @@
 3. ```python -um code.scripts.denoise_test <SEED>``` where <SEED> is an integer representing the random seed. This will do a full spectral norm sweep for a single seed. Repeat as many times as you wish.
 4. To plot the results, point to the experiment output data directory in line 116 of code/lib/hist_plot_cifar.py. Then run 
   ```python -um code.lib.hist_plot_cifar```
+# Kernel ridge regression == DEQ test (Appendix G)
+1. ```python -um code.scripts.mnist''' will run through the full MNIST dataset and plot images that are different as .pdf files. It will also produce the plot in Figure 14.
+  
