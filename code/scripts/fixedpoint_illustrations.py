@@ -8,7 +8,7 @@ DIR = 'outputs/fixedpoint_illustrations/'
 
 matplotlib_config()
 
-y = np.linspace(-2, 2, NUM_POINTS)
+y = np.linspace(-2.5, 2.5, NUM_POINTS)
 lin = lambda theta, y: theta[0]*y + theta[1]
 g = lambda theta, y: np.tanh(lin(theta, y))
 relu = lambda theta, y: (lin(theta, y) > 0) * lin(theta, y)

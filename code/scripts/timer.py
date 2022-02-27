@@ -6,15 +6,15 @@ import matplotlib.pyplot as plt
 from ..lib.deq import DEQGLMConv
 from ..lib.plotters import matplotlib_config
 
-NUM_TRIALS = 1
+NUM_TRIALS = 100
 MATRIX_SIZE_MAX = 1000
 MATRIX_SIZE_MIN = 50
 MATRIX_SIZE_STP = 50
 
-NUM_CHANNELS_MAX = 20
+NUM_CHANNELS_MAX = 64
 NUM_CHANNELS_MIN = 1
 NUM_CHANNELS_STP = 1
-IMAGE_SIZE = 100
+IMAGE_SIZE = 32
 
 #MODE = 'MLP' 
 MODE = 'CONV'
@@ -80,9 +80,13 @@ else:
 matplotlib_config()
 plt.plot(matrix_sizes, times_rand, 'b')
 plt.plot(matrix_sizes, times_kern, 'g')
-plt.xlabel(r'$n$')
+if MODE == 'CONV':
+    plt.xlabel(r'\# Channels')
+elif MODE == 'MLP':
+    plt.xlabel(r'Width')
 plt.ylabel(r'Time (seconds)')
 plt.gca().set_yscale('log')
 plt.tight_layout()
-plt.legend(['Random initialisation', 'Kernel initialisation'], fontsize=20)
-plt.savefig('times.pdf')
+plt.legend(['Random initialisation', 'Kernel initialisation'], fontsize=20,
+        loc='upper left')
+plt.savefig('times' + MODE + '.pdf')
