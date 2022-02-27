@@ -39,6 +39,10 @@ class ConvNet(nn.Module):
             self.conv1.weight = nn.parameter.Parameter(-torch.from_numpy(k1/lamb))
             self.conv2.weight = nn.parameter.Parameter(torch.from_numpy(k1/lamb))
 
+        self.spec_norm = (\
+                    self._spec_norm(self.conv1.weight.detach().cpu().numpy(), input_dim)+\
+                                self._spec_norm(self.conv2.weight.detach().cpu().numpy(),input_dim))/2
+
     def _init_kernel(self):
         self.kernel = lambda x1, x2, ls: np.exp(-\
                 sp.distance.cdist(x1, x2, 'sqeuclidean')/(2*ls**2)).\
