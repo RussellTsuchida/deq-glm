@@ -14,5 +14,6 @@
 4. To plot the results, point to the experiment output data directory in line 116 of code/lib/hist_plot_cifar.py. Then run 
   ```python -um code.lib.hist_plot_cifar```
 # Kernel ridge regression == DEQ test (Appendix G)
-1. ```python -um code.scripts.mnist''' will run through the full MNIST dataset and plot images that are different as .pdf files. It will also produce the plot in Figure 14.
+1. Install the example ```klr``` library. This can be achieved by ```git clone https://github.com/RussellTsuchida/klr.git```, followed by ```cd klr``` and then ```pip install .```
+2. ```python -um code.scripts.mnist``` will run through the full MNIST dataset and plot images that are different as .pdf files. It will also produce the plot in Figure 14.
   
