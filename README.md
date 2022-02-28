@@ -1,4 +1,5 @@
 # DECLARATIVE NETS THAT ARE EQUILIBRIUM MODELS
+Code repository to accompany the paper Declarative nets that are equilibrium models, accepted into ICLR22 and available here https://openreview.net/forum?id=q4HaTeMO--y.
 
 0. > pip install -r requirements.txt
 
