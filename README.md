@@ -3,8 +3,6 @@ Code repository to accompany the paper Declarative nets that are equilibrium mod
 
 0. > pip install -r requirements.txt
 
-# TODO: add folder layout
-
 # Fully connected architecture experiments
 1. Make sure the directory pointed to by [line 28](https://github.com/RussellTsuchida/deq-glm/blob/main/code/scripts/regression_test.py#L28) of code/scripts/regression_test.py exists
 2. ``` python -um code.scripts.regression_test <SEED> ``` where `<SEED>` is an integer representing the random seed. Run this multiple times for multiple random seeds.
